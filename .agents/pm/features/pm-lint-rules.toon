@@ -6,9 +6,11 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:56.132Z"
-updated_at: "2026-10-12T14:34:36.095Z"
+updated_at: "2026-10-12T14:37:15.472Z"
+assignee: codex-sol
+claim_principal: codex-sol
 author: codex-sol
-acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
+acceptance_criteria: Each PML001-PML010 predicate passes its own real-tracker regression test; rule engine and PML001 PML002 PML004 regressions fail when only their function behavior is reverted; findings exclude item text
 parent: pm-lint-epic
 comments[6]{created_at,author,text}:
   "2026-10-12T14:13:21.766Z",pi-glm-rules,"Claimed. Plan: implement src/rules.ts exporting RULES (PML001-PML010) with RuleContext; test with real SDK trackers via test/helpers.ts tracker(t); adjust only pure metadata for boundary timestamps/arrays. Choices: PML005 default staleDays=14 via parameters; PML004 evidence fields resolution/actual_result/close_reason/close comments; PML008 normalized title-vs-description/note equality."

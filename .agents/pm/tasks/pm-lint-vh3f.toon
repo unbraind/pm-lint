@@ -6,16 +6,15 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:14:32.929Z"
-updated_at: "2026-10-12T14:24:52.666Z"
-assignee: pi-glm-tooling
-claim_principal: pi-glm-tooling
+updated_at: "2026-10-12T14:37:17.784Z"
 author: pi-glm-tooling
 parent: pm-lint-gate
-comments[4]{created_at,author,text}:
+comments[5]{created_at,author,text}:
   "2026-10-12T14:19:41.770Z",pi-glm-tooling,"Scope: package tooling only. Copied pm-review gate scripts already match the reference worktree byte-for-byte (coverage/docstring/duplication/identity/lint/main-invocation/verify-release-publish-attestation), so no script changes were needed. package.json coverageGate.sources widened from src+index.ts to the full authored scope src, scripts, index.ts, eslint.config.ts with 100/100/100/100 thresholds and no ignore list; the gate additionally auto-requires index.ts and reconciles a fresh walk against the c8 report."
   "2026-10-12T14:19:42.291Z",pi-glm-tooling,"Authored test/tooling.test.ts (35 tests): identity-gate fixtures with real git repositories (unapproved authors/committers, added home paths, side branches, fail-closed policy), coverage-gate fixture projects covering every refusal and success path incl. main wiring, docstring-gate in-process and main runs, entry-point guard branches, publish-attestation verifier both entry answers, lint/duplication launchers as real child runs, manifest scope assertions, type-only src/types.ts load, release-workflow tracking link and gitignore fence. Standalone run: 35/35 pass."
   "2026-10-12T14:21:11.695Z",pi-glm-tooling,"Committed: full-scope coverage gate config, tooling suite and packed acceptance plus the tracked identity baseline (identity-gate: 0 violations after the commit). Tooling scope is 100% covered on every dimension (scripts/*, eslint.config.ts, src/types.ts at 100/100/100/100). npm run test:install and node scripts/coverage-gate.ts currently fail only because concurrent src/rules.ts is not yet authored (build and the in-flight engine/settings/commands suites import it); recorded run results are linked to this task."
   "2026-10-12T14:24:52.666Z",pi-glm-tooling,"Packed acceptance diagnosis: pm package install of the tarball refuses command registration because registerCommand with flags requires the schema capability; manifest.json declares commands only. Follow-up task filed under pm-lint-cli with the one-line manifest fix; test/install.acceptance.ts is complete and will pass once the manifest declares both capabilities."
+  "2026-10-12T14:37:16.425Z",codex-sol,"Orchestrator verification completed: tooling 35/35, complete authored source coverage 100 percent in every dimension, and packed consumer test 1/1 across npm/npx and native Bun/bunx. Earlier host contract blockers are now repaired and covered by actual CLI acceptance. Package release gates remain the final verification step."
 files[12]{path,scope}:
   .github/approved-git-identities.txt,project
   .github/identity-baseline.txt,project

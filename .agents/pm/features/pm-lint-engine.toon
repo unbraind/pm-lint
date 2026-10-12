@@ -6,11 +6,11 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:55.445Z"
-updated_at: "2026-10-12T14:33:15.351Z"
+updated_at: "2026-10-12T14:36:00.375Z"
 assignee: codex-sol
 claim_principal: codex-sol
 author: codex-sol
-acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
+acceptance_criteria: A strict complete SDK receipt includes terminal items before selection; malformed storage refuses before findings; filtered items retain children and duplicate peers; severity thresholds produce the documented exit verdict
 parent: pm-lint-epic
 comments[3]{created_at,author,text}:
   "2026-10-12T14:14:53.413Z",codex-sol,"Engine certifies listAllComplete before filtering and retains the whole corpus for hierarchy and duplicate context. PML010 delegates scoring to SDK duplicates with an explicit complete cluster limit. Findings contain static hints and ids, never item text."
