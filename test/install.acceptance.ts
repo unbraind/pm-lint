@@ -12,12 +12,13 @@ interface LintVerdict {
   scanned: number;
   corpus_count: number;
   fail_on: string;
-  exit_code: number;
+  /** Present only when findings met the failure threshold; absence means success. */
+  exit_code?: number;
 }
 
 /** One item identity as reported by the consumer CLI's `create` command. */
 interface CreatedItem {
-  item: { id: string };
+  id: string;
 }
 
 /** Every stable rule code this package documents, used to disable the whole set. */
@@ -75,7 +76,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.ok(initial.verdict.scanned >= 1, 'selection defaults to the whole certified corpus');
     assert.ok(initial.verdict.findings.every(finding => RULE_CODES.includes(finding.rule)), 'findings carry stable rule codes');
     assert.ok(['info', 'warn', 'error'].includes(initial.verdict.fail_on), 'the exit policy names a stable severity');
-    assert.ok(initial.verdict.findings.some(finding => finding.item_id === created.item.id), 'the weak item is reported with its complete canonical id');
+    assert.ok(initial.verdict.findings.some(finding => finding.item_id === created.id), 'the weak item is reported with its complete canonical id');
     assert.ok(initial.verdict.findings.every(finding => finding.severity === 'error' || finding.severity === 'warn' || finding.severity === 'info'), 'findings carry stable severities');
     // Disabling the whole documented rule set must empty the verdict without hiding the corpus.
     const disabled = lintCommand(cwd, runner, prefix, pmRoot, RULE_CODES.flatMap(code => ['--disable', code]));
@@ -87,7 +88,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     const toon = spawnSync(runner, [...prefix, 'lint'], { cwd, encoding: 'utf8', env: { ...process.env, HOME: cwd, PM_PATH: pmRoot, PM_AUTHOR: 'install-test' } });
     assert.equal(toon.error, undefined);
     assert.ok(toon.stdout.length > 0, 'the default rendering is host TOON, not silence');
-    assert.equal(toon.status, initial.verdict.exit_code, 'TOON and JSON renderings share one exit contract');
+    assert.equal(toon.status, initial.verdict.exit_code ?? 0, 'TOON and JSON renderings share one exit contract');
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });
