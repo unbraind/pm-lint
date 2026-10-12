@@ -110,7 +110,9 @@
   "coverageGate": {
     "sources": [
       "src",
-      "index.ts"
+      "scripts",
+      "index.ts",
+      "eslint.config.ts"
     ],
     "tests": [
       "test/*.test.ts"

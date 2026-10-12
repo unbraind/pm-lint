@@ -1,0 +1,36 @@
+id: pm-lint-vh3f
+title: "Cover package tooling: gates, workflows and packed consumers"
+description: ""
+type: Task
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-12T14:14:32.929Z"
+updated_at: "2026-10-12T14:20:02.723Z"
+assignee: pi-glm-tooling
+claim_principal: pi-glm-tooling
+author: pi-glm-tooling
+parent: pm-lint-gate
+comments[2]{created_at,author,text}:
+  "2026-10-12T14:19:41.770Z",pi-glm-tooling,"Scope: package tooling only. Copied pm-review gate scripts already match the reference worktree byte-for-byte (coverage/docstring/duplication/identity/lint/main-invocation/verify-release-publish-attestation), so no script changes were needed. package.json coverageGate.sources widened from src+index.ts to the full authored scope src, scripts, index.ts, eslint.config.ts with 100/100/100/100 thresholds and no ignore list; the gate additionally auto-requires index.ts and reconciles a fresh walk against the c8 report."
+  "2026-10-12T14:19:42.291Z",pi-glm-tooling,"Authored test/tooling.test.ts (35 tests): identity-gate fixtures with real git repositories (unapproved authors/committers, added home paths, side branches, fail-closed policy), coverage-gate fixture projects covering every refusal and success path incl. main wiring, docstring-gate in-process and main runs, entry-point guard branches, publish-attestation verifier both entry answers, lint/duplication launchers as real child runs, manifest scope assertions, type-only src/types.ts load, release-workflow tracking link and gitignore fence. Standalone run: 35/35 pass."
+files[12]{path,scope}:
+  .github/approved-git-identities.txt,project
+  .github/identity-baseline.txt,project
+  package.json,project
+  scripts/coverage-gate.ts,project
+  scripts/docstring-gate.ts,project
+  scripts/duplication-gate.ts,project
+  scripts/identity-gate.ts,project
+  scripts/lint.ts,project
+  scripts/main-invocation.ts,project
+  scripts/verify-release-publish-attestation.ts,project
+  test/install.acceptance.ts,project
+  test/tooling.test.ts,project
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/tooling.test.ts,project,pi-glm-tooling,"2026-10-12T14:19:47.204Z",local_mutation,feat/lint
+  "npm run test:install",project,pi-glm-tooling,"2026-10-12T14:19:47.820Z",local_mutation,feat/lint
+  node scripts/coverage-gate.ts,project,pi-glm-tooling,"2026-10-12T14:19:48.588Z",local_mutation,feat/lint
+docs[1]{path,scope}:
+  README.md,project
+body: ""
