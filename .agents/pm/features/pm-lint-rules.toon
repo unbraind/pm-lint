@@ -2,12 +2,20 @@ id: pm-lint-rules
 title: Implement ten authoring quality rules
 description: ""
 type: Feature
-status: open
+status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:56.132Z"
-updated_at: "2026-10-12T14:11:56.132Z"
+updated_at: "2026-10-12T14:33:14.379Z"
+assignee: pi-glm-rules
+claim_principal: pi-glm-rules
 author: codex-sol
 acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
 parent: pm-lint-epic
+comments[5]{created_at,author,text}:
+  "2026-10-12T14:13:21.766Z",pi-glm-rules,"Claimed. Plan: implement src/rules.ts exporting RULES (PML001-PML010) with RuleContext; test with real SDK trackers via test/helpers.ts tracker(t); adjust only pure metadata for boundary timestamps/arrays. Choices: PML005 default staleDays=14 via parameters; PML004 evidence fields resolution/actual_result/close_reason/close comments; PML008 normalized title-vs-description/note equality."
+  "2026-10-12T14:21:15.952Z",pi-glm-rules,"Rule semantics chosen for the four unspecified slots: PML001 warn description: blank description on non-terminal items. PML002 error assignee: in_progress without assignee and claim_principal. PML006 info acceptance_criteria: missing on open/in_progress/blocked (drafts and terminal excluded). PML007 warn deadline: deadline in the past on non-terminal items, absent or invalid deadlines ignored. PML003: when a title lists criteria via semicolon/newline, each criterion needs an observable verb or explicit condition; works/done-only criteria and duplicated criteria are bad; a title identical to another item is bad. PML009: blocked items need a blocked_reason AND a local non-self blocker ref (blocked_by or blocked_by-kind dependency matching another item id); prose/URLs never count. PML005 counts updated_at plus comment, note, linked-test provenance and test-run timestamps as activity."
+  "2026-10-12T14:29:47.687Z",pi-glm-rules,"Rule contract correction absorbed: prior delegation lacked the original definitions and tested wrong semantics (PML001 description, PML002 ownership, PML006 criteria, PML007 deadline). Orchestrator-corrected contract now under test: PML001 vague/placeholder title; PML002 open/in_progress Feature/Issue/Task without acceptance criteria; PML003 unverifiable criteria with semicolon/newline splits; PML004 closed without closure evidence (close-time or labeled comments only, invalid closed_at cannot infer); PML005 stale in_progress and stale claims (default 14 days, exactly-14 not flagged); PML006 Feature without linked files or tests; PML007 childless Epic over the whole corpus with scalar parent and both SDK hierarchy alias directions; PML008 description/notes only restating the title; PML009 blocked without reason or with unresolvable local blocker reference (prose and URLs valid); PML010 pure SDK duplicate membership."
+  "2026-10-12T14:30:53.330Z",codex-sol,Corrected implementation uses the exact requested PML001-PML010 mapping. PML007 resolves hierarchy aliases through the public SDK relationship registry; PML009 allows prose or external blockers while diagnosing dangling or self local references. Rule test author verifies each predicate against real SDK trackers.
+  "2026-10-12T14:33:14.379Z",codex-sol,"Behavioral revert proofs: with only vagueTitle disabled PML001 yields 2 assertion failures; only missingCriteria disabled PML002 yields 2; only missingClosureEvidence disabled PML004 yields 1. Each run used node --test test/engine.test.ts, the real SDK fixture suite. Baseline and restored implementation both pass 6/6. Source bytes restored after every single-function revert."
 body: ""

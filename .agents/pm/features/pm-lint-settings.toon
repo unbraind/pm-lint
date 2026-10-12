@@ -6,10 +6,19 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:57.465Z"
-updated_at: "2026-10-12T14:12:05.927Z"
+updated_at: "2026-10-12T14:33:17.028Z"
 assignee: codex-sol
 claim_principal: codex-sol
 author: codex-sol
 acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
 parent: pm-lint-epic
+comments[1]{created_at,author,text}:
+  "2026-10-12T14:14:54.118Z",codex-sol,"SDK gap: readSettings strips extension-owned keys. The lint section is read through public getSettingsPath/readFileIfExists after SDK core validation; no private imports or settings mutation. Unknown rules, severities and parameter keys fail closed."
+files[2]{path,scope}:
+  src/settings.ts,project
+  test/settings.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/settings.test.ts,project,codex-sol,"2026-10-12T14:14:58.890Z",local_mutation,feat/lint
+docs[1]{path,scope}:
+  README.md,project
 body: ""
