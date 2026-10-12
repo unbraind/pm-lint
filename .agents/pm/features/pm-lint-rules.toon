@@ -6,9 +6,7 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:56.132Z"
-updated_at: "2026-10-12T14:34:27.663Z"
-assignee: pi-glm-rules
-claim_principal: pi-glm-rules
+updated_at: "2026-10-12T14:34:36.095Z"
 author: codex-sol
 acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
 parent: pm-lint-epic
