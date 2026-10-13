@@ -54,7 +54,7 @@ function iso(ms: number): string {
 }
 
 describe('rule table', () => {
-  it('exports ten ordered rules with the requested severities, fields and one-line hints', () => {
+  it('exports ten ordered rules with severities, scopes, fields, descriptions and one-line hints', () => {
     assert.equal(RULES.length, 10);
     assert.deepEqual(
       RULES.map(entry => entry.code),
@@ -63,6 +63,10 @@ describe('rule table', () => {
     assert.deepEqual(
       RULES.map(entry => entry.severity),
       ['warn', 'error', 'warn', 'error', 'warn', 'info', 'warn', 'info', 'error', 'warn'],
+    );
+    assert.deepEqual(
+      RULES.map(entry => entry.scope),
+      ['non_terminal', 'non_terminal', 'non_terminal', 'closed', 'active', 'all', 'non_terminal', 'non_terminal', 'blocked', 'active'],
     );
     assert.deepEqual(
       RULES.map(entry => entry.field),
@@ -81,6 +85,8 @@ describe('rule table', () => {
     );
     for (const entry of RULES) {
       assert.ok(entry.field.length > 0, `${entry.code} names a field`);
+      assert.ok(entry.description.length > 0, `${entry.code} describes what it checks`);
+      assert.ok(!entry.description.includes('\n'), `${entry.code} description stays on one line`);
       assert.ok(entry.hint.length > 0, `${entry.code} carries a hint`);
       assert.ok(!entry.hint.includes('\n'), `${entry.code} hint stays on one line`);
       assert.equal(typeof entry.check, 'function', `${entry.code} provides a predicate`);
@@ -112,11 +118,13 @@ describe('PML001 vague placeholder titles', () => {
     assert.equal(check(findById(items, repoTicket.item.id), context), true);
     assert.equal(check(findById(items, concrete.item.id), context), false);
     assert.equal(check(findById(items, scoped.item.id), context), false);
+    const excerpt = ruleFor('PML001').excerpt;
+    assert.equal(excerpt?.(findById(items, todo.item.id), context), 'TODO');
   });
 });
 
 describe('PML002 missing acceptance criteria', () => {
-  it('flags open and in-progress work types without criteria and ignores other statuses and types', async (t: TestContext) => {
+  it('flags work types without criteria independently of engine lifecycle selection', async (t: TestContext) => {
     const { client } = await tracker(t);
     const specified = await client.create({ title: 'Specified feature work', type: 'Feature', acceptanceCriteria: 'returns the parsed value' });
     const bareFeature = await client.create({ title: 'Bare feature work', type: 'Feature' });
@@ -141,10 +149,10 @@ describe('PML002 missing acceptance criteria', () => {
     assert.equal(check(findById(items, bareTask.item.id), context), true);
     assert.equal(check(findById(items, startedFeature.item.id), context), true);
     assert.equal(check(findById(items, startedTask.item.id), context), true);
-    assert.equal(check(findById(items, blockedTask.item.id), context), false);
-    assert.equal(check(findById(items, draftTask.item.id), context), false);
-    assert.equal(check(findById(items, closedTask.item.id), context), false);
-    assert.equal(check(findById(items, canceledTask.item.id), context), false);
+    assert.equal(check(findById(items, blockedTask.item.id), context), true);
+    assert.equal(check(findById(items, draftTask.item.id), context), true);
+    assert.equal(check(findById(items, closedTask.item.id), context), true);
+    assert.equal(check(findById(items, canceledTask.item.id), context), true);
     assert.equal(check(findById(items, bareEpic.item.id), context), false);
     assert.equal(check(findById(items, blankCriteria.item.id), context), true);
     assert.equal(
@@ -154,15 +162,14 @@ describe('PML002 missing acceptance criteria', () => {
   });
 });
 
-describe('PML003 unverifiable acceptance criteria', () => {
-  it('validates every semicolon and newline criterion independently', async (t: TestContext) => {
+describe('PML003 vague acceptance criteria', () => {
+  it('flags placeholder, tautological and wordless fragments while concrete criteria pass', async (t: TestContext) => {
     const { client } = await tracker(t);
     const withoutCriteria = await client.create({ title: 'Criteria-less work item', type: 'Task' });
     const delimiterOnly = await client.create({ title: 'Delimiter-only criteria work', type: 'Task', acceptanceCriteria: ';;;' });
     const observable = await client.create({ title: 'Observable criteria work', type: 'Task', acceptanceCriteria: 'returns the parsed value; outputs the sorted list' });
     const mixedBad = await client.create({ title: 'Mixed criteria work', type: 'Task', acceptanceCriteria: 'returns the value; done' });
     const newlineBad = await client.create({ title: 'Newline criteria work', type: 'Task', acceptanceCriteria: 'returns the value\nit works' });
-    const noVerb = await client.create({ title: 'Verbless criteria work', type: 'Task', acceptanceCriteria: 'make it nicer' });
     const identical = await client.create({ title: 'Fix the login flow', type: 'Task', acceptanceCriteria: 'fix the LOGIN flow!' });
     const condition = await client.create({ title: 'Conditional criteria work', type: 'Task', acceptanceCriteria: 'fails when the input is empty' });
     const unlessClause = await client.create({ title: 'Unless criteria work', type: 'Task', acceptanceCriteria: 'rejects bad input unless the fix lands' });
@@ -178,7 +185,6 @@ describe('PML003 unverifiable acceptance criteria', () => {
     assert.equal(check(findById(items, observable.item.id), context), false);
     assert.equal(check(findById(items, mixedBad.item.id), context), true);
     assert.equal(check(findById(items, newlineBad.item.id), context), true);
-    assert.equal(check(findById(items, noVerb.item.id), context), true);
     assert.equal(check(findById(items, identical.item.id), context), true);
     assert.equal(check(findById(items, condition.item.id), context), false);
     assert.equal(check(findById(items, unlessClause.item.id), context), false);
@@ -187,10 +193,65 @@ describe('PML003 unverifiable acceptance criteria', () => {
     assert.equal(check(findById(items, explicitWords.item.id), context), false);
     assert.equal(check(findById(items, passExit.item.id), context), false);
   });
+
+  it('flags every documented placeholder phrase, with punctuation and case folding', async (t: TestContext) => {
+    const { client } = await tracker(t);
+    const placeholders = await Promise.all([
+      'Works.',
+      'it works',
+      'Done!',
+      'fixed',
+      'complete',
+      'ok',
+      'as expected',
+      'looks good',
+      'should work',
+      'TBD',
+      'N/A',
+      'see description',
+    ].map(/** One item per placeholder phrase keeps excerpts unambiguous. */ criterion => client.create({ title: `Placeholder criteria holder for ${criterion}`, type: 'Task', acceptanceCriteria: `returns the value; ${criterion}` })));
+    const concrete = await client.create({ title: 'Concrete outcome holder work', type: 'Task', acceptanceCriteria: 'returns the value; the deployment log names the released tag' });
+    const items = await corpus(client);
+    const check = ruleFor('PML003').check;
+    const excerpt = ruleFor('PML003').excerpt;
+    const context = lintContext(items);
+    for (const placeholder of placeholders) {
+      const meta = findById(items, placeholder.item.id);
+      assert.equal(check(meta, context), true, `placeholder ${placeholder.item.id} is flagged`);
+      const offending = excerpt?.(meta, context);
+      assert.ok(offending !== undefined && offending !== '', 'the excerpt names the vague criterion');
+    }
+    assert.equal(check(findById(items, concrete.item.id), context), false);
+    assert.equal(excerpt?.(findById(items, concrete.item.id), context), undefined);
+  });
+
+  it('keeps real verifiable criteria green and flags short wordless fragments without observable words', async (t: TestContext) => {
+    const { client } = await tracker(t);
+    const regenerated = await client.create({ title: 'Regenerate the packaged data', type: 'Task', acceptanceCriteria: 'pm-cli-data.json regenerated' });
+    const drifted = await client.create({ title: 'Reconcile the drifted locales', type: 'Task', acceptanceCriteria: 'Any drifted snippet is corrected in all locales' });
+    const distinguished = await client.create({ title: 'Publish the deployment state', type: 'Task', acceptanceCriteria: 'Publication and deployment state distinguished from candidate validation' });
+    const suitePass = await client.create({ title: 'Green suite holder work', type: 'Task', acceptanceCriteria: 'tests pass' });
+    const shipIt = await client.create({ title: 'Ship it holder work', type: 'Task', acceptanceCriteria: 'ship it' });
+    const punctuationOnly = await client.create({ title: 'Punctuation holder work', type: 'Task', acceptanceCriteria: '!!!' });
+    const shortObservable = await Promise.all(['CI badge', 'preserve rollback', 'container healthy'].map(criterion => client.create({ title: `Observable short criterion for ${criterion}`, type: 'Task', acceptanceCriteria: criterion })));
+    const items = await corpus(client);
+    const check = ruleFor('PML003').check;
+    const excerpt = ruleFor('PML003').excerpt;
+    const context = lintContext(items);
+    assert.equal(check(findById(items, regenerated.item.id), context), false, 'a regenerated artifact names an observable outcome');
+    assert.equal(check(findById(items, drifted.item.id), context), false, 'corrected snippets name an observable outcome');
+    assert.equal(check(findById(items, distinguished.item.id), context), false, 'distinguished states name an observable outcome');
+    assert.equal(check(findById(items, suitePass.item.id), context), false, 'a short fragment with an observable verb stays green');
+    assert.equal(check(findById(items, shipIt.item.id), context), true, 'a wordless short fragment is vague');
+    assert.equal(excerpt?.(findById(items, shipIt.item.id), context), 'ship it');
+    for (const entry of shortObservable) assert.equal(check(findById(items, entry.item.id), context), false, 'a short artifact, preservation action or health state is observable');
+    assert.equal(check(findById(items, punctuationOnly.item.id), context), true, 'punctuation without words is vague');
+    assert.equal(excerpt?.(findById(items, punctuationOnly.item.id), context), '!!!');
+  });
 });
 
 describe('PML004 closed without evidence', () => {
-  it('ignores open items and accepts each evidence field beyond the title', async (t: TestContext) => {
+  it('checks selected items and accepts each evidence field beyond the title', async (t: TestContext) => {
     const { client } = await tracker(t);
     const openItem = await client.create({ title: 'Still open closure work', type: 'Task' });
     const resolved = await client.create({ title: 'Resolved closure work', type: 'Task' });
@@ -207,7 +268,7 @@ describe('PML004 closed without evidence', () => {
     const reasonedMeta = await oneItem(client, reasoned.item.id);
     const titleEchoMeta = await oneItem(client, titleEcho.item.id);
     const check = ruleFor('PML004').check;
-    assert.equal(check(openMeta, lintContext([openMeta])), false);
+    assert.equal(check(openMeta, lintContext([openMeta])), true);
     assert.equal(check(resolvedMeta, lintContext([resolvedMeta])), false);
     assert.equal(check(actualMeta, lintContext([actualMeta])), false);
     assert.equal(check(reasonedMeta, lintContext([reasonedMeta])), false);
@@ -273,7 +334,7 @@ describe('PML005 stale in-progress work and claims', () => {
     assert.equal(check(stale, lintContext([stale], { now: base, parameters: { staleDays: 7 } })), true);
   });
 
-  it('flags stale claims regardless of status and ignores terminal ownership', async (t: TestContext) => {
+  it('checks stale claims independently of engine terminal selection', async (t: TestContext) => {
     const { client } = await tracker(t);
     const claimed = await client.create({ title: 'Claimed work item', type: 'Task' });
     await client.claim(claimed.item.id);
@@ -296,7 +357,7 @@ describe('PML005 stale in-progress work and claims', () => {
     );
     assert.equal(
       check(adjust(terminalMeta, { updated_at: iso(base - 20 * MS_PER_DAY) }), lintContext([terminalMeta], { now: base })),
-      false,
+      true,
     );
     assert.equal(
       check(adjust(canceledMeta, { updated_at: iso(base - 20 * MS_PER_DAY) }), lintContext([canceledMeta], { now: base })),
@@ -487,6 +548,10 @@ describe('PML008 context restating the title', () => {
     assert.equal(check(emptyNote, context), false);
     const noNotes = adjust(echoMeta, { notes: undefined });
     assert.equal(check(noNotes, context), true);
+    const excerpt = ruleFor('PML008').excerpt;
+    assert.equal(excerpt?.(echoMeta, context), 'fix   LOGIN!');
+    assert.equal(excerpt?.(findById(items, noteEcho.item.id), context), 'fix   LOGOUT!');
+    assert.equal(excerpt?.(findById(items, noteDifferent.item.id), context), undefined);
   });
 });
 
@@ -541,7 +606,7 @@ describe('PML009 blocked without justification', () => {
     const context = lintContext(items);
     const localMeta = findById(items, localRef.item.id);
     const depMeta = findById(items, depValid.item.id);
-    assert.equal(check(findById(items, openItem.item.id), context), false);
+    assert.equal(check(findById(items, openItem.item.id), context), true);
     assert.equal(check(findById(items, noReason.item.id), context), true);
     assert.equal(check(findById(items, reasonOnly.item.id), context), false);
     assert.equal(check(localMeta, context), false);
@@ -558,6 +623,11 @@ describe('PML009 blocked without justification', () => {
     assert.ok(realDep !== undefined, 'dependency blocked item retains its edge');
     const selfDep = adjust(depMeta, { blocked_by: undefined, dependencies: [{ ...realDep, id: depValid.item.id }] });
     assert.equal(check(selfDep, context), true);
+    const excerpt = ruleFor('PML009').excerpt;
+    assert.equal(excerpt?.(findById(items, depGhost.item.id), context), 'lint-test-missing-9999', 'the excerpt names the SDK-qualified ghost blocker reference');
+    assert.equal(excerpt?.(findById(items, pmGhost.item.id), context), 'pm-ghost-missing');
+    assert.equal(excerpt?.(findById(items, prefixGhost.item.id), context), 'lint-test-missing-9999');
+    assert.equal(excerpt?.(findById(items, noReason.item.id), context), undefined, 'a missing reason names no reference text');
   });
 });
 

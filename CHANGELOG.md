@@ -1,9 +1,10 @@
 # Changelog
 
-## 2026.10.12 - 2026-10-12
+## 2026.10.13 - 2026-10-13
 
 ### Added
 
+- Dogfood improvement round: precise PML003, finding excerpts, scopes, lint rules and read_output ([pm-lint-trap](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-trap.toon))
 - Implement ten authoring quality rules ([pm-lint-rules](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-rules.toon))
 - Certify package CI and packed consumers ([pm-lint-gate](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-gate.toon))
 - Configure lint rules through SDK settings ([pm-lint-settings](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-settings.toon))

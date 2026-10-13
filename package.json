@@ -1,6 +1,6 @@
 {
   "name": "pm-lint",
-  "version": "2026.10.12",
+  "version": "2026.10.13",
   "description": "Authoring-quality lint rules for useful pm item context",
   "repository": {
     "type": "git",
@@ -44,15 +44,14 @@
     "verify:release-publish-attestation": "node scripts/verify-release-publish-attestation.ts",
     "identity:check": "node scripts/identity-gate.ts"
   },
-  "dependencies": {},
   "peerDependencies": {
-    "@unbrained/pm-cli": ">=2026.10.10"
+    "@unbrained/pm-cli": ">=2026.10.13"
   },
   "devDependencies": {
     "@babel/eslint-parser": "8.0.6",
     "@babel/plugin-syntax-typescript": "8.0.3",
     "@types/node": "26.6.4",
-    "@unbrained/pm-cli": "2026.10.10",
+    "@unbrained/pm-cli": "2026.10.13",
     "c8": "^12.0.0",
     "eslint": "10.12.0",
     "fast-glob": "3.3.3",

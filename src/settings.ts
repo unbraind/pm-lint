@@ -1,6 +1,6 @@
 import { getSettingsPath, readFileIfExists, readSettings } from '@unbrained/pm-cli/sdk';
 import { RULES } from './rules.ts';
-import type { LintConfig, RuleCode, RuleConfig, Severity } from './types.ts';
+import type { LintConfig, RuleCode, RuleConfig, RuleScope, Severity } from './types.ts';
 
 /** CLI overrides and item filters accepted by both extension and embedded callers. */
 export interface LintOptions {
@@ -24,6 +24,15 @@ export function objectValue(value: unknown): Record<string, unknown> {
 export function severityValue(value: unknown): Severity {
   if (value !== 'error' && value !== 'warn' && value !== 'info') throw new Error('Severity must be error, warn or info');
   return value;
+}
+
+/** Documented lifecycle slices a rule can be scoped to through settings. */
+export const RULE_SCOPES: readonly RuleScope[] = ['all', 'non_terminal', 'active', 'terminal', 'closed', 'canceled', 'open', 'in_progress', 'blocked'];
+
+/** Validate one rule lifecycle scope against the documented vocabulary. */
+export function scopeValue(value: unknown): RuleScope {
+  if (typeof value !== 'string' || !RULE_SCOPES.includes(value as RuleScope)) throw new Error('Scope must be all, non_terminal, active, terminal, closed, canceled, open, in_progress or blocked');
+  return value as RuleScope;
 }
 
 /** Reject misspelled rule codes so a purported CI gate cannot silently do less work. */
@@ -69,7 +78,7 @@ function parametersFor(code: RuleCode, value: unknown): Record<string, number> {
 /** Merge defaults, persisted policy and explicit CLI overrides without mutating input objects. */
 export function resolveConfig(raw: unknown, options: LintOptions = {}): LintConfig {
   const section = raw === undefined ? {} : objectValue(raw);
-  const rules = Object.fromEntries(RULES.map(/** Start every rule with its documented defaults. */ rule => [rule.code, { enabled: true, severity: rule.severity, parameters: {} }])) as Record<RuleCode, RuleConfig>;
+  const rules = Object.fromEntries(RULES.map(/** Start every rule with its documented defaults. */ rule => [rule.code, { enabled: true, severity: rule.severity, scope: rule.scope, parameters: {} }])) as Record<RuleCode, RuleConfig>;
   for (const key of Object.keys(section)) {
     if (!['enable', 'disable', 'rules', 'failOn'].includes(key)) throw new Error('Unknown lint settings key');
   }
@@ -80,13 +89,14 @@ export function resolveConfig(raw: unknown, options: LintOptions = {}): LintConf
       const code = ruleCode(key);
       const entry = objectValue(value);
       for (const property of Object.keys(entry)) {
-        if (!['enabled', 'severity', 'parameters'].includes(property)) throw new Error('Unknown per-rule lint settings key');
+        if (!['enabled', 'severity', 'scope', 'parameters'].includes(property)) throw new Error('Unknown per-rule lint settings key');
       }
       if (entry.enabled !== undefined) {
         if (typeof entry.enabled !== 'boolean') throw new Error('Rule enabled must be boolean');
         rules[code].enabled = entry.enabled;
       }
       if (entry.severity !== undefined) rules[code].severity = severityValue(entry.severity);
+      if (entry.scope !== undefined) rules[code].scope = scopeValue(entry.scope);
       if (entry.parameters !== undefined) rules[code].parameters = parametersFor(code, entry.parameters);
     }
   }

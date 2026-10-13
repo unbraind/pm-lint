@@ -4,16 +4,29 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, readdir } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { PmClient } from '@unbrained/pm-cli/sdk';
 
 /** One lint verdict as rendered by the packed extension command. */
 interface LintVerdict {
-  findings: { item_id: string; rule: string; severity: string; field: string; hint: string }[];
+  findings: { item_id: string; rule: string; severity: string; field: string; hint: string; title: string; excerpt: string }[];
   count: number;
   scanned: number;
   corpus_count: number;
+  summary: Record<string, Record<string, number>>;
   fail_on: string;
   /** Present only when findings met the failure threshold; absence means success. */
   exit_code?: number;
+}
+
+/** One row of the rule table as rendered by the packed `pm lint rules` command. */
+interface RuleRow {
+  code: string;
+  severity: string;
+  scope: string;
+  field: string;
+  description: string;
+  hint: string;
+  settings: string;
 }
 
 /** One item identity as reported by the consumer CLI's `create` command. */
@@ -24,30 +37,88 @@ interface CreatedItem {
 /** Every stable rule code this package documents, used to disable the whole set. */
 const RULE_CODES = ['PML001', 'PML002', 'PML003', 'PML004', 'PML005', 'PML006', 'PML007', 'PML008', 'PML009', 'PML010'];
 
-/** Run a consumer command with isolated HOME and tracker coordinates, preserving stderr for failures. */
-function command(cwd: string, name: string, args: string[], pmRoot: string, home = cwd): string {
+/** Isolated consumer environment shared by packed commands and package managers. */
+function consumerEnv(cwd: string, pmRoot: string, home = cwd): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, PM_PATH: pmRoot, PM_AUTHOR: 'install-test', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', NPM_CONFIG_USERCONFIG: '/dev/null', npm_config_userconfig: '/dev/null' };
   for (const key of Object.keys(env)) if (key.toLowerCase() === 'npm_config_allow_scripts') delete env[key];
-  const result = spawnSync(name, args, { cwd, encoding: 'utf8', env, maxBuffer: 16 * 1024 * 1024 });
+  return env;
+}
+
+/** Execute a real consumer process and preserve diagnostics on unexpected exits. */
+function runConsumer(cwd: string, name: string, args: string[], pmRoot: string, home = cwd): { stdout: string; status: number | null } {
+  const result = spawnSync(name, args, { cwd, encoding: 'utf8', env: consumerEnv(cwd, pmRoot, home), maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.error, undefined);
-  assert.equal(result.status, 0, `${name} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`);
+  assert.ok(result.status === 0 || result.status === 1, `${name} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`);
+  return { stdout: result.stdout, status: result.status };
+}
+
+/** Execute setup commands, which must succeed rather than return a lint verdict. */
+function command(cwd: string, name: string, args: string[], pmRoot: string, home = cwd): string {
+  const result = runConsumer(cwd, name, args, pmRoot, home);
+  assert.equal(result.status, 0, result.stdout);
   return result.stdout;
 }
 
-/** Run the packed lint command and return its rendered verdict plus process status. */
+/** Parse a host-shaped JSON read while preserving the lint exit status. */
+function jsonRead(cwd: string, runner: string, prefix: string[], pmRoot: string, subcommand: string[], extra: string[]): { data: Record<string, unknown>; status: number | null } {
+  const result = runConsumer(cwd, runner, [...prefix, '--json', 'lint', ...subcommand, ...extra], pmRoot);
+  return { data: JSON.parse(result.stdout) as Record<string, unknown>, status: result.status };
+}
+
+/** Read a complete lint verdict for assertions independent of host compaction. */
 function lintCommand(cwd: string, runner: string, prefix: string[], pmRoot: string, extra: string[] = []): { verdict: LintVerdict; status: number | null } {
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: cwd, PM_PATH: pmRoot, PM_AUTHOR: 'install-test', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', NPM_CONFIG_USERCONFIG: '/dev/null', npm_config_userconfig: '/dev/null' };
-  const result = spawnSync(runner, [...prefix, '--json', 'lint', ...extra], { cwd, encoding: 'utf8', env, maxBuffer: 16 * 1024 * 1024 });
-  assert.equal(result.error, undefined);
-  const verdict = JSON.parse(result.stdout) as LintVerdict;
-  assert.equal(verdict.count, verdict.findings.length, 'the rendered count must match the findings array');
+  const result = jsonRead(cwd, runner, prefix, pmRoot, [], extra);
+  const verdict = result.data as unknown as LintVerdict;
+  assert.equal(verdict.count, verdict.findings.length, 'the full rendered count must match the findings array');
   return { verdict, status: result.status };
 }
 
-test('packed npm/npx and native Bun/bunx consumers lint a real tracker through the extension', { timeout: 1800000 }, async t => {
+/** Read lint rows with host projection or compaction controls applied. */
+function lintRaw(cwd: string, runner: string, prefix: string[], pmRoot: string, extra: string[]): Record<string, unknown> {
+  return jsonRead(cwd, runner, prefix, pmRoot, [], extra).data;
+}
+
+/** Read the packed rule listing, which always exits successfully. */
+function rulesCommand(cwd: string, runner: string, prefix: string[], pmRoot: string, extra: string[] = []): { rules: RuleRow[]; count: number } {
+  const result = jsonRead(cwd, runner, prefix, pmRoot, ['rules'], extra);
+  assert.equal(result.status, 0);
+  return result.data as unknown as { rules: RuleRow[]; count: number };
+}
+
+/** Follow every declared continuation and reject overlap, omissions and non-progress. */
+function continuationRows(cwd: string, runner: string, prefix: string[], pmRoot: string, subcommand: string[], path: string, key: string): string[] {
+  const collected: string[] = [];
+  let cursor: string | undefined;
+  let budget = 900;
+  for (let pageIndex = 0; pageIndex < 100; pageIndex += 1) {
+    const extra = ['--output-budget', String(budget), ...(cursor === undefined ? [] : ['--output-cursor', cursor])];
+    const page = jsonRead(cwd, runner, prefix, pmRoot, subcommand, extra).data;
+    const rows = page[path] as Record<string, string>[];
+    assert.ok(rows.length > 0, 'every continuation makes progress');
+    for (const row of rows) collected.push(path === 'findings' ? `${row.item_id}:${row.rule}` : row[key]);
+    const receipt = page.output_budget_truncation as { continuations?: { path: string; cursor: string }[] } | undefined;
+    const next = receipt?.continuations?.find(entry => entry.path === path)?.cursor;
+    if (collected.length === rows.length && cursor === undefined && next === undefined && budget > 450) {
+      collected.length = 0;
+      budget -= 150;
+      continue;
+    }
+    if (cursor === undefined) assert.ok(next, 'a bounded read has a continuation');
+    if (next === undefined) {
+      assert.equal(new Set(collected).size, collected.length, 'no row repeats across pages');
+      return collected.sort();
+    }
+    assert.notEqual(next, cursor, 'continuation advances');
+    cursor = next;
+  }
+  assert.fail('continuation did not terminate within 100 pages');
+}
+
+test('packed npm/npx and native Bun/bunx consumers lint a real tracker through the extension', { timeout: 3600000 }, async t => {
   const root = resolve(import.meta.dirname, '..');
   const scratch = await mkdtemp(join(tmpdir(), 'pm-lint-install-'));
-  t.after(async () => { await rm(scratch, { recursive: true, force: true }); });
+  // Package-manager caches can still be flushing when the scratch directory is removed.
+  t.after(async () => { await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
   // npm 10 still runs prepare during pack; its source workspace must use the source tracker.
   const packOutput = command(root, 'npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch], join(root, '.agents/pm'), scratch);
   // npm 10 can prefix its final JSON array with prepare output.
@@ -67,7 +138,8 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     const prefix = runtime === 'npm' ? ['--no-install', 'pm'] : ['--bun', '--no-install', 'pm'];
     command(cwd, runner, [...prefix, 'init', 'consumer', '--defaults', '--agent-guidance', 'skip', '--json'], pmRoot);
     command(cwd, runner, [...prefix, 'install', tarball, '--project', '--json'], pmRoot);
-    assert.match(command(cwd, runner, [...prefix, 'lint', '--help'], pmRoot), /lint/);
+    const help = command(cwd, runner, [...prefix, 'lint', '--help'], pmRoot).replace(/\s+/g, ' ');
+    for (const text of ['Run only these rule codes', 'Skip these rule codes', 'Lint only these item ids', 'Lowest severity', 'SDK item type', 'comma-separated statuses', 'calendar date', 'Override the severity']) assert.ok(help.includes(text), `help describes ${text}`);
     // A deliberately weak item joins the certified corpus before the first verdict.
     const created = JSON.parse(command(cwd, runner, [...prefix, 'create', 'Feature', 'Weak context item', '--description', 'Weak context item', '--json'], pmRoot)) as CreatedItem;
     // The default verdict must cover the certified complete corpus and report the weak item.
@@ -78,12 +150,45 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.ok(['info', 'warn', 'error'].includes(initial.verdict.fail_on), 'the exit policy names a stable severity');
     assert.ok(initial.verdict.findings.some(finding => finding.item_id === created.id), 'the weak item is reported with its complete canonical id');
     assert.ok(initial.verdict.findings.every(finding => finding.severity === 'error' || finding.severity === 'warn' || finding.severity === 'info'), 'findings carry stable severities');
+    assert.ok(initial.verdict.findings.every(finding => finding.title === 'Weak context item'), 'findings carry the offending title');
+    const restated = initial.verdict.findings.find(finding => finding.rule === 'PML008');
+    assert.equal(restated?.excerpt, 'Weak context item', 'the restated description is excerpted');
+    assert.ok(initial.verdict.findings.every(finding => typeof finding.excerpt === 'string' && finding.excerpt.length <= 160), 'excerpts stay bounded');
+    assert.equal(initial.verdict.summary.PML002.error, initial.verdict.findings.filter(finding => finding.rule === 'PML002').length, 'the per-rule summary counts findings by severity');
+    // The rule table read command lists the documented defaults and settings keys.
+    const listing = rulesCommand(cwd, runner, prefix, pmRoot);
+    assert.equal(listing.count, 10);
+    assert.deepEqual(listing.rules.map(row => row.code), RULE_CODES);
+    for (const row of listing.rules) {
+      assert.ok(row.description.length > 0, `${row.code} lists a description`);
+      assert.ok(row.scope.length > 0, `${row.code} lists a default scope`);
+      assert.equal(row.settings, `lint.rules.${row.code}`, `${row.code} names its settings key`);
+    }
+    // Host output projection narrows finding rows to the requested fields.
+    const projected = lintRaw(cwd, runner, prefix, pmRoot, ['--output-include', 'item_id,rule']);
+    const projectedRows = (projected.findings as { item_id: string; rule: string }[]).map(row => Object.keys(row).sort());
+    assert.ok(projectedRows.length > 0, 'the projected verdict still carries rows');
+    for (const keys of projectedRows) assert.deepEqual(keys, ['item_id', 'rule'], 'projection keeps only the requested fields');
     // Disabling the whole documented rule set must empty the verdict without hiding the corpus.
     const disabled = lintCommand(cwd, runner, prefix, pmRoot, RULE_CODES.flatMap(code => ['--disable', code]));
     assert.equal(disabled.verdict.count, 0, 'no findings survive a full rule disable');
     assert.equal(disabled.verdict.scanned, initial.verdict.scanned, 'selection is independent of rule enablement');
     assert.equal(disabled.verdict.corpus_count, initial.verdict.corpus_count, 'certification is independent of rule enablement');
     assert.equal(disabled.status, 0, 'an empty verdict exits successfully');
+    // Budget compaction returns a resumable continuation cursor for the findings rows.
+    const fixtureClient = new PmClient({ cwd, pmRoot, author: 'install-test', noExtensions: true });
+    for (let index = 2; index <= 5; index += 1) {
+      const title = `Continuation weak item number ${index}`;
+      await fixtureClient.create({ type: 'Feature', title, description: title, acceptanceCriteria: 'works', allowDuplicate: true });
+    }
+    const full = lintRaw(cwd, runner, prefix, pmRoot, []);
+    const fullIds = (full.findings as { item_id: string; rule: string }[]).map(row => `${row.item_id}:${row.rule}`).sort();
+    assert.ok(fullIds.length >= 10, 'the grown corpus carries enough findings to compact');
+    assert.deepEqual(continuationRows(cwd, runner, prefix, pmRoot, [], 'findings', 'item_id'), fullIds, 'finding continuations cover the full verdict');
+    const limitedRules = rulesCommand(cwd, runner, prefix, pmRoot, ['--output-limit', '2', '--output-include', 'code,scope']);
+    assert.equal(limitedRules.rules.length, 2, 'the host limits declared rule rows');
+    assert.deepEqual(Object.keys(limitedRules.rules[0]).sort(), ['code', 'scope'], 'the host projects declared rule rows');
+    assert.deepEqual(continuationRows(cwd, runner, prefix, pmRoot, ['rules'], 'rules', 'code'), RULE_CODES, 'rule continuations cover the full registry');
     // The host renderer emits TOON by default and keeps the exit contract.
     const toon = spawnSync(runner, [...prefix, 'lint'], { cwd, encoding: 'utf8', env: { ...process.env, HOME: cwd, PM_PATH: pmRoot, PM_AUTHOR: 'install-test' } });
     assert.equal(toon.error, undefined);
