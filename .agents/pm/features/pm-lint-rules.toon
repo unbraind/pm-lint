@@ -2,12 +2,34 @@ id: pm-lint-rules
 title: Implement ten authoring quality rules
 description: ""
 type: Feature
-status: open
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:56.132Z"
-updated_at: "2026-10-12T14:11:56.132Z"
+updated_at: "2026-10-13T17:32:19.971Z"
+closed_at: "2026-10-13T17:32:19.933Z"
+completed_at: "2026-10-13T17:32:19.933Z"
+claim_principal: codex-sol
 author: codex-sol
-acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
+acceptance_criteria: "Each PML001-PML010 predicate passes its own real-tracker regression test; rule engine and PML001 PML002 PML004 regressions fail when only their function behavior is reverted; each finding carries the item id, rule code, severity, field, title, a fix hint and an excerpt of the offending text capped at 160 characters, and the README states that lint output may therefore contain item text"
 parent: pm-lint-epic
+resolution: PML001-PML010 with per-rule regression tests and behavioural revert proofs; findings carry title and 160-char excerpt
+expected_result: Each rule passes its real-tracker test; reverts fail
+actual_result: "CI test (22), test (26) and codeql green on PR #6; orchestrator-run isolated npm release:check 78/78 with 100% coverage; pm lint rules lists all ten with severity, scope, field and settings key"
+comments[7]{created_at,author,text}:
+  "2026-10-12T14:13:21.766Z",pi-glm-rules,"Claimed. Plan: implement src/rules.ts exporting RULES (PML001-PML010) with RuleContext; test with real SDK trackers via test/helpers.ts tracker(t); adjust only pure metadata for boundary timestamps/arrays. Choices: PML005 default staleDays=14 via parameters; PML004 evidence fields resolution/actual_result/close_reason/close comments; PML008 normalized title-vs-description/note equality."
+  "2026-10-12T14:21:15.952Z",pi-glm-rules,"Rule semantics chosen for the four unspecified slots: PML001 warn description: blank description on non-terminal items. PML002 error assignee: in_progress without assignee and claim_principal. PML006 info acceptance_criteria: missing on open/in_progress/blocked (drafts and terminal excluded). PML007 warn deadline: deadline in the past on non-terminal items, absent or invalid deadlines ignored. PML003: when a title lists criteria via semicolon/newline, each criterion needs an observable verb or explicit condition; works/done-only criteria and duplicated criteria are bad; a title identical to another item is bad. PML009: blocked items need a blocked_reason AND a local non-self blocker ref (blocked_by or blocked_by-kind dependency matching another item id); prose/URLs never count. PML005 counts updated_at plus comment, note, linked-test provenance and test-run timestamps as activity."
+  "2026-10-12T14:29:47.687Z",pi-glm-rules,"Rule contract correction absorbed: prior delegation lacked the original definitions and tested wrong semantics (PML001 description, PML002 ownership, PML006 criteria, PML007 deadline). Orchestrator-corrected contract now under test: PML001 vague/placeholder title; PML002 open/in_progress Feature/Issue/Task without acceptance criteria; PML003 unverifiable criteria with semicolon/newline splits; PML004 closed without closure evidence (close-time or labeled comments only, invalid closed_at cannot infer); PML005 stale in_progress and stale claims (default 14 days, exactly-14 not flagged); PML006 Feature without linked files or tests; PML007 childless Epic over the whole corpus with scalar parent and both SDK hierarchy alias directions; PML008 description/notes only restating the title; PML009 blocked without reason or with unresolvable local blocker reference (prose and URLs valid); PML010 pure SDK duplicate membership."
+  "2026-10-12T14:30:53.330Z",codex-sol,Corrected implementation uses the exact requested PML001-PML010 mapping. PML007 resolves hierarchy aliases through the public SDK relationship registry; PML009 allows prose or external blockers while diagnosing dangling or self local references. Rule test author verifies each predicate against real SDK trackers.
+  "2026-10-12T14:33:14.379Z",codex-sol,"Behavioral revert proofs: with only vagueTitle disabled PML001 yields 2 assertion failures; only missingCriteria disabled PML002 yields 2; only missingClosureEvidence disabled PML004 yields 1. Each run used node --test test/engine.test.ts, the real SDK fixture suite. Baseline and restored implementation both pass 6/6. Source bytes restored after every single-function revert."
+  "2026-10-12T14:34:27.663Z",pi-glm-rules,"Rewrote test/rules.test.ts against the corrected contract after the prior delegation tested wrong semantics and imported a removed findingFor export. Result: 11 suites, 14 tests, all pass. Every rule owns assertions on real temp SDK trackers (create/update/claim/comments/notes/close), expected values asserted literally, never derived from rule outputs. Boundaries covered: PML003 semicolon/newline splits with every criterion judged; PML004 planning vs labeled vs post-close comments plus missing/invalid closed_at; PML005 exactly-14-days not flagged, greater flagged, default and explicit staleDays, stale unclaimed in_progress and stale claims regardless of status, comments/notes/test_runs activity, terminal closed/canceled ignored; PML006 Features in any status with absent and empty files/tests arrays; PML007 whole-corpus children incl closed ones, scalar parent plus parent/epic and child/task SDK alias directions, dangling/self/related not children; PML008 punctuation/case/space folding with empty context ignored; PML009 prose and URL blockers valid, missing/self/ghost local refs flagged; PML010 pure projection of analyzeDuplicateItems membership from the certified active corpus. Focused coverage: c8 --all --include src/rules.ts --100 --reports-dir rules-coverage.local node --test test/rules.test.ts reports 100% statements, branches, functions, lines. Docstring and fleet lint gates clean on the file."
+  "2026-10-13T15:10:13.362Z",claude-hub,"Acceptance criteria corrected (CodeRabbit PR #6 finding): findings deliberately include title and a 160-character excerpt since the dogfood round, so the earlier 'findings exclude item text' clause contradicted the shipped contract (src/types.ts) and README."
+files[2]{path,scope}:
+  src/rules.ts,project
+  test/rules.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/rules.test.ts,project,pi-glm-rules,"2026-10-12T14:33:41.454Z",local_mutation,feat/lint
+docs[1]{path,scope}:
+  README.md,project
+close_reason: Ten authoring rules implemented
 body: ""

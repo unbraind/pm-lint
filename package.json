@@ -1,6 +1,6 @@
 {
   "name": "pm-lint",
-  "version": "2026.10.12",
+  "version": "2026.10.13",
   "description": "Authoring-quality lint rules for useful pm item context",
   "repository": {
     "type": "git",
@@ -39,20 +39,20 @@
     "release:check": "npm run identity:check && npm run typecheck && npm run lint && npm run duplication && npm run build && npm run docstring && npm run coverage && npm run audit:prod && npm run pack:dry-run && npm run changelog:check && npm run verify:release-publish-attestation && npm run test:install",
     "prepublishOnly": "npm run release:check",
     "release:notes": "pm-changelog --pm-root .agents/pm --stdout --since-previous-tag --until-release-tag --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-lint/blob/main/.agents/pm --respect-item-release --status closed,in_progress --pm-bin ./node_modules/.bin/pm --github-step-summary --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded",
+    "prepare": "node scripts/prepare-merge-driver.ts",
     "merge:install": "pm merge install",
     "coverage": "npm run build && npm run build:test && node scripts/coverage-gate.ts",
     "verify:release-publish-attestation": "node scripts/verify-release-publish-attestation.ts",
     "identity:check": "node scripts/identity-gate.ts"
   },
-  "dependencies": {},
   "peerDependencies": {
-    "@unbrained/pm-cli": ">=2026.10.10"
+    "@unbrained/pm-cli": ">=2026.10.13"
   },
   "devDependencies": {
     "@babel/eslint-parser": "8.0.6",
     "@babel/plugin-syntax-typescript": "8.0.3",
     "@types/node": "26.6.4",
-    "@unbrained/pm-cli": "2026.10.10",
+    "@unbrained/pm-cli": "2026.10.13",
     "c8": "^12.0.0",
     "eslint": "10.12.0",
     "fast-glob": "3.3.3",
@@ -110,7 +110,9 @@
   "coverageGate": {
     "sources": [
       "src",
-      "index.ts"
+      "scripts",
+      "index.ts",
+      "eslint.config.ts"
     ],
     "tests": [
       "test/*.test.ts"

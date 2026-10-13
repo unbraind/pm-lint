@@ -2,14 +2,28 @@ id: pm-lint-settings
 title: Configure lint rules through SDK settings
 description: ""
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:57.465Z"
-updated_at: "2026-10-12T14:12:05.927Z"
-assignee: codex-sol
+updated_at: "2026-10-13T17:32:21.626Z"
+closed_at: "2026-10-13T17:32:21.611Z"
+completed_at: "2026-10-13T17:32:21.611Z"
 claim_principal: codex-sol
 author: codex-sol
-acceptance_criteria: Real SDK tracker tests verify the feature; linked files docs and test commands identify the implementation and evidence
+acceptance_criteria: Public SDK settings helpers read the lint section; enable disable severity and numeric parameters override defaults; CLI flags override persisted policy; malformed policy fails closed
 parent: pm-lint-epic
+resolution: "lint section: enable/disable, severity and numeric parameters; CLI flags override; malformed policy fails closed"
+expected_result: Settings override defaults and flags override settings
+actual_result: "CI test (22), test (26) and codeql green on PR #6; orchestrator-run isolated npm release:check 78/78 with 100% coverage; settings tests in the 78-test suite"
+comments[1]{created_at,author,text}:
+  "2026-10-12T14:14:54.118Z",codex-sol,"SDK gap: readSettings strips extension-owned keys. The lint section is read through public getSettingsPath/readFileIfExists after SDK core validation; no private imports or settings mutation. Unknown rules, severities and parameter keys fail closed."
+files[2]{path,scope}:
+  src/settings.ts,project
+  test/settings.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/settings.test.ts,project,codex-sol,"2026-10-12T14:14:58.890Z",local_mutation,feat/lint
+docs[1]{path,scope}:
+  README.md,project
+close_reason: Lint policy configurable through SDK settings
 body: ""
