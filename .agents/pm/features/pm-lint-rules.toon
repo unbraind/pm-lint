@@ -2,16 +2,20 @@ id: pm-lint-rules
 title: Implement ten authoring quality rules
 description: ""
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-12T14:11:56.132Z"
-updated_at: "2026-10-13T15:10:13.362Z"
-assignee: codex-sol
+updated_at: "2026-10-13T17:32:19.971Z"
+closed_at: "2026-10-13T17:32:19.933Z"
+completed_at: "2026-10-13T17:32:19.933Z"
 claim_principal: codex-sol
 author: codex-sol
 acceptance_criteria: "Each PML001-PML010 predicate passes its own real-tracker regression test; rule engine and PML001 PML002 PML004 regressions fail when only their function behavior is reverted; each finding carries the item id, rule code, severity, field, title, a fix hint and an excerpt of the offending text capped at 160 characters, and the README states that lint output may therefore contain item text"
 parent: pm-lint-epic
+resolution: PML001-PML010 with per-rule regression tests and behavioural revert proofs; findings carry title and 160-char excerpt
+expected_result: Each rule passes its real-tracker test; reverts fail
+actual_result: "CI test (22), test (26) and codeql green on PR #6; orchestrator-run isolated npm release:check 78/78 with 100% coverage; pm lint rules lists all ten with severity, scope, field and settings key"
 comments[7]{created_at,author,text}:
   "2026-10-12T14:13:21.766Z",pi-glm-rules,"Claimed. Plan: implement src/rules.ts exporting RULES (PML001-PML010) with RuleContext; test with real SDK trackers via test/helpers.ts tracker(t); adjust only pure metadata for boundary timestamps/arrays. Choices: PML005 default staleDays=14 via parameters; PML004 evidence fields resolution/actual_result/close_reason/close comments; PML008 normalized title-vs-description/note equality."
   "2026-10-12T14:21:15.952Z",pi-glm-rules,"Rule semantics chosen for the four unspecified slots: PML001 warn description: blank description on non-terminal items. PML002 error assignee: in_progress without assignee and claim_principal. PML006 info acceptance_criteria: missing on open/in_progress/blocked (drafts and terminal excluded). PML007 warn deadline: deadline in the past on non-terminal items, absent or invalid deadlines ignored. PML003: when a title lists criteria via semicolon/newline, each criterion needs an observable verb or explicit condition; works/done-only criteria and duplicated criteria are bad; a title identical to another item is bad. PML009: blocked items need a blocked_reason AND a local non-self blocker ref (blocked_by or blocked_by-kind dependency matching another item id); prose/URLs never count. PML005 counts updated_at plus comment, note, linked-test provenance and test-run timestamps as activity."
@@ -27,4 +31,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/rules.test.ts,project,pi-glm-rules,"2026-10-12T14:33:41.454Z",local_mutation,feat/lint
 docs[1]{path,scope}:
   README.md,project
+close_reason: Ten authoring rules implemented
 body: ""
