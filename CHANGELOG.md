@@ -13,5 +13,6 @@
 
 ### Other
 
+- Register merge drivers during CI install ([pm-lint-41oh](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-41oh.toon))
 - Cover package tooling: gates, workflows and packed consumers ([pm-lint-vh3f](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-vh3f.toon))
 - Build useful item authoring lint ([pm-lint-epic](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/epics/pm-lint-epic.toon))
