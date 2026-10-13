@@ -2,14 +2,20 @@ id: pm-lint-1c6j
 title: Declare the schema capability so packed command flags activate
 description: "Packed-consumer acceptance (pm package install of the tarball) fails activation: registerCommand flags requires capability 'schema' in extension manifest capabilities. manifest.json currently declares capabilities [commands] only; registerLintCommand registers repeatable flags, so the manifest must also declare schema (capabilities: commands, schema). Verified against the packed tarball install path."
 type: Task
-status: open
+status: closed
 priority: 1
 tags: []
 created_at: "2026-10-12T14:24:52.111Z"
-updated_at: "2026-10-12T14:36:08.536Z"
+updated_at: "2026-10-13T15:10:21.730Z"
+closed_at: "2026-10-13T15:10:15.683Z"
+completed_at: "2026-10-13T15:10:15.683Z"
 author: pi-glm-tooling
 parent: pm-lint-cli
+resolution: Declared the schema capability in manifest.json so registerCommand flag registration is permitted for packed installs
+expected_result: pm install of the packed tarball activates pm lint with its repeatable flags
+actual_result: Packed npm/npx and native Bun/bunx acceptance pass 1/1 with repeated --disable flags; CI test (22) and test (26) green on PR #6
 comments[2]{created_at,author,text}:
   "2026-10-12T14:28:09.555Z",pi-glm-tooling,"Packed-tarball verification found two more real-host contract gaps in the command registration, beyond the schema capability already described: (1) the real host derives allowed option keys from FlagDefinition.long by stripping exactly two leading dashes, so long: '--disable <value>' registers the key 'disable <value>' and every flag use fails with Unknown option '--disable' while the SDK testing harness accepts it; fix by declaring long without the value placeholder (for example long: '--disable', value_name: 'value'), and note FlagDefinition exposes list rather than repeatable for repeatable string flags (see pm-jev flags: long '--full', value_type, value_name). (2) the host readHandlerResultExitCode contract requires that a command result not carry an exit_code own property of 0: exit_code must be 1..255 and present only on failure, so runLintCommand must omit exit_code when the verdict passes (return the verdict without the exit_code key on success, keep exit_code: 1 when findings meet fail_on). The manifest.json schema capability is required for any registerCommand with flags: pm package install refused activation with hint 'registerCommand flags requires capability schema in extension manifest capabilities' until capabilities became [commands, schema]; that one-line manifest.json change is applied in the package worktree for verification and needs to be committed with the CLI work."
   "2026-10-12T14:36:08.030Z",codex-sol,"Host adapter now resolves the recorded flag registration and successful exit-control gaps. Packed npm/npx and native Bun/bunx acceptance passes 1/1 with repeated disable flags, TOON JSON and complete corpus counts. SDK testing dispatch remains covered alongside actual CLI acceptance."
+close_reason: "manifest.json declares the schema capability, so packed command flags activate; packed npm/npx and native Bun/bunx acceptance passes 1/1 with repeated disable flags (see the item's final comment and PR #6 CI test (22)/(26) green at 28e7c5c)."
 body: ""
