@@ -6,9 +6,7 @@ status: in_progress
 priority: 1
 tags[2]: ci,merge-drivers
 created_at: "2026-10-13T14:25:02.875Z"
-updated_at: "2026-10-13T14:39:26.988Z"
-assignee: pi-grok
-claim_principal: pi-grok
+updated_at: "2026-10-13T14:42:15.189Z"
 author: pi-grok
 acceptance_criteria: npm ci runs the canonical prepare hook; the tracked merge fence matches pm merge install; artifact creation skips driver installation without changing git config; release checks and the CI health command pass
 parent: pm-lint-gate
