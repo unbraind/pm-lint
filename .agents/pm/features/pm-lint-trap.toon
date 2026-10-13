@@ -6,13 +6,13 @@ status: in_progress
 priority: 1
 tags: []
 created_at: "2026-10-13T12:02:03.064Z"
-updated_at: "2026-10-13T14:06:08.330Z"
+updated_at: "2026-10-13T14:07:45.205Z"
 assignee: pi-grok
 claim_principal: pi-grok
 author: pi-agent
 acceptance_criteria: "PML003 flags only vague placeholder criteria on the real corpus with before and after counts plus ten hand-checked samples; every finding carries the offending title and a bounded excerpt; authoring rules carry per-rule default scopes overridable through settings and --status; pm lint rules lists the rule table and the lint receipt has per-rule summary counts; every CLI flag has a real help description; both lint commands declare the SDK read_output contract on the 2026.10.13 pin and packed consumers exercise the host output flags; README, changelog and dogfood table are updated; release gates pass at unchanged thresholds"
 parent: pm-lint-epic
-comments[14]{created_at,author,text}:
+comments[15]{created_at,author,text}:
   "2026-10-13T12:02:15.406Z",pi-agent,"Plan: invert PML003 to a vague-criteria predicate, add title/excerpt to findings, add per-rule default scopes, add a lint rules command and summary counts, write real flag help, bump the host SDK pin to 2026.10.13 and declare the read_output contract on both lint commands. Dogfood on the companion tracker and every fleet tracker copy in scratch projects."
   "2026-10-13T12:02:26.015Z",pi-agent,"Plan: invert PML003 to a vague-criteria predicate, add title/excerpt to findings, add per-rule default scopes, add a lint rules command and summary counts, write real flag help, bump the host SDK pin to 2026.10.13 and declare the read_output contract on both lint commands. Dogfood on the companion tracker and every fleet tracker copy in scratch projects."
   "2026-10-13T12:46:33.246Z",codex-agent,"Taking over the interrupted implementation as authorized. Reviewing all six findings, completing packed-host acceptance, and measuring copied real-data corpora before full npm and Bun release gates."
@@ -27,6 +27,7 @@ comments[14]{created_at,author,text}:
   "2026-10-13T13:53:04.017Z",pi-grok,"Re-verified the six findings against the uncommitted diff and the copied-corpus receipts. 26 trackers, 5998 items, 2216 to 640 findings, PML003 1512 to 0, source inventories unchanged, packed rules artifact matches the current build. Corrected the hand-checked sample so each of the first ten baseline hits keeps its real lifecycle and a generic verdict. FlagDefinition.description is supported; readSettings still strips the custom lint section. Starting npm and bun release gates."
   "2026-10-13T13:58:17.197Z",pi-grok,"The npm release gate passed identity, typecheck, lint, duplication, docstrings, 69 unit tests at 100/100/100/100, audit and changelog check, then the packed acceptance after-hook failed removing a still-flushing package-manager cache. Cleanup now retries that race. Re-running both release gates."
   "2026-10-13T14:06:08.330Z",pi-grok,"Both release gates passed with unchanged 100/100/100/100 thresholds. npm run release:check: identity 0 violations, duplication 0/2881, 69 unit tests passed, coverage gate met, production audit 0 vulnerabilities, changelog current, packed install acceptance passed. bun run release:check: the same 69 unit tests passed, coverage gate met, packed install acceptance passed. Eight behavioral mutants had already failed with assertion errors. Item stays open for orchestrator verification."
+  "2026-10-13T14:07:45.205Z",pi-grok,"Opened the pull request for orchestrator review: https://github.com/unbraind/pm-lint/pull/6. Dependabot pull requests 1 through 5 were left untouched. Item remains in progress."
 files[16]{path,scope}:
   index.ts,project
   manifest.json,project
