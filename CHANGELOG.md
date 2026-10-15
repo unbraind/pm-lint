@@ -11,9 +11,12 @@
 - Implement ten authoring quality rules ([pm-lint-rules](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-rules.toon))
 - Certify package CI and packed consumers ([pm-lint-gate](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-gate.toon))
 
-### Other
+### Changed
 
 - Enable the gated GitHub issue sync and drop the braces chain ([pm-lint-maint1014](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-maint1014.toon))
+
+### Other
+
 - Build useful item authoring lint ([pm-lint-epic](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/epics/pm-lint-epic.toon))
 - Cover package tooling: gates, workflows and packed consumers ([pm-lint-vh3f](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-vh3f.toon))
 - Register merge drivers during CI install ([pm-lint-41oh](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-41oh.toon))
