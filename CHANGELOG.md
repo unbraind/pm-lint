@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs ([pm-lint-8kis](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-8kis.toon))
 - Enable the gated GitHub issue sync and drop the braces chain ([pm-lint-maint1014](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-maint1014.toon))
 
 ### Other
