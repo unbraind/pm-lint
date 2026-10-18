@@ -2,12 +2,17 @@ id: pm-lint-maint1014
 title: Enable the gated GitHub issue sync and drop the braces chain
 description: Enable the SHA-pinned fail-closed issue sync caller and remove fast-glob by adopting published pm-ops 2026.10.14. Keep existing thresholds and verify isolated npm and Bun release gates.
 type: Chore
-status: in_progress
+status: closed
 priority: 1
 tags[1]: changed
 created_at: "2026-10-14T10:03:41.322Z"
-updated_at: "2026-10-15T12:27:33.899Z"
+updated_at: "2026-10-17T08:13:24.010Z"
+closed_at: "2026-10-17T08:13:24.001Z"
+completed_at: "2026-10-15T15:49:30.000Z"
 author: codex-agent
+resolution: "Delivered by https://github.com/unbraind/pm-lint/pull/7 (merge 434f6f75be62, head a8fb22b0ed35)"
+expected_result: "Delivered by the linked pull request, merged after its head check gate passed."
+actual_result: "Merged at 2026-10-15T15:49:30Z; no readable required checks, so every completed head check run had to succeed, be neutral or be skipped; successful checks: CodeQL, CodeRabbit, codeql, cubic · AI code reviewer, test (22), test (26)"
 comments[3]{created_at,author,text}:
   "2026-10-14T10:04:08.397Z",codex-agent,"Plan: author this package own thin caller, pin workflow SHA and pm-github to 2026.10.13, and verify isolated npm/Bun release gates without changing thresholds. Remove fast-glob and any jscpd4 alias; pin pm-ops 2026.10.14. Published changelog reviewed: attestation alias/function rejection, read-only pack prepare, release repair and Windows proof support. Duplication now uses Node glob with jscpd 5. No workflow dispatch, bot requests, merges, or source function changes."
   "2026-10-14T10:07:02.531Z",codex-agent,"Audit before: full 4 vulnerabilities (4 high), production 0. After: full 0, production 0; npm ls braces is empty. The caller runs at 17 1 * * * UTC. It validates access, previews the complete plan, imports with --gate, verifies repeat-import idempotency and privacy, then checks strict health before commit/push/PR. SHA pin matches published pm-github 2026.10.13. Actionlint skipped: binary missing and offline npx registry metadata unavailable. GitHub Actions PR-creation setting verified enabled. No direct fast-glob imports in authored scripts. The package prepare contract will be checked independently."
@@ -21,4 +26,5 @@ tests[2]{command,scope,timeout_seconds,pm_context_mode,provenance{author,created
   "env -u PM_PATH -u PM_AUTHOR HOME=$(mktemp -d) GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bun run release:check",project,3600,tracker,codex-agent,"2026-10-14T10:07:29.823Z",local_mutation,chore/gated-issue-sync-and-braces-free-gates
 docs[1]{path,scope}:
   CHANGELOG.md,project
+close_reason: "{\"pr\":7,\"url\":\"https://github.com/unbraind/pm-lint/pull/7\",\"merge_commit_sha\":\"434f6f75be626308dbff872cd43329c54893ca1e\",\"head_sha\":\"a8fb22b0ed351a6bcee3280cf9876700e486eaa1\",\"merged_at\":\"2026-10-15T15:49:30Z\",\"checks\":[\"CodeQL\",\"CodeRabbit\",\"codeql\",\"cubic · AI code reviewer\",\"test (22)\",\"test (26)\"]}"
 body: ""
