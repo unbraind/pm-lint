@@ -2,6 +2,11 @@ import { defineExtension } from '@unbrained/pm-cli/sdk/authoring';
 import type { ExtensionApi } from '@unbrained/pm-cli/sdk/authoring';
 import { registerLintCommand } from './src/commands.ts';
 
+/** Expose portable evidence-backed baseline operations and typed refusals. */
+export { acknowledgeFinding, BaselineRefusal, parseBaseline, RULE_VERSION, sourceDigest } from './src/baseline.ts';
+/** Expose baseline contracts for agents using any tracker backend. */
+export type { Acknowledgment, BaselineRefusalCode, LintBaseline } from './src/baseline.ts';
+
 /** Expose the same complete-reader engine used by the host command. */
 export { lintItems, SEVERITY_RANK } from './src/engine.ts';
 /** Expose strict settings resolution for embedded consumers. */

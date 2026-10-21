@@ -6,9 +6,14 @@ import { RULES } from './rules.ts';
 import { readLintSettings, resolveConfig } from './settings.ts';
 import type { LintOptions } from './settings.ts';
 import type { Finding, RuleCode, RuleScope, Severity } from './types.ts';
+import { assertBaselinePolicy, isAcknowledged, parseBaseline, RULE_VERSION, sourceDigest } from './baseline.ts';
 
 /** Privacy-conscious lint result with corpus certification and deterministic exit status. */
 export interface LintResult {
+  debt_count: number;
+  new_count: number;
+  /** Entries whose finding is absent or evidence has changed; never treated as current debt. */
+  stale_count: number;
   findings: Finding[];
   count: number;
   scanned: number;
@@ -80,6 +85,8 @@ export function duplicateItemIds(result: DuplicateItemsAnalysis, items: readonly
 /** Lint the certified SDK corpus, reuse SDK duplication analysis and fail on configured severity. */
 export async function lintItems(client: PmClient, pmRoot: string, options: LintOptions = {}, now: number = Date.now()): Promise<LintResult> {
   const config = resolveConfig(await readLintSettings(pmRoot), options);
+  const baseline = options.baseline === undefined ? undefined : parseBaseline(options.baseline);
+  if (baseline !== undefined) assertBaselinePolicy(config, resolveConfig(undefined), options);
   const corpus = certifyCompleteListResult(await client.listAllComplete());
   const selected = selectItems(corpus.items, options);
   let duplicateIds = new Set<string>();
@@ -98,11 +105,15 @@ export async function lintItems(client: PmClient, pmRoot: string, options: LintO
       if (options.status === undefined && !inScope(effective.scope, item.status)) continue;
       const context = { items: corpus.items, now, parameters: effective.parameters, duplicateIds };
       if (!rule.check(item, context)) continue;
-      const finding: Finding = { item_id: item.id, rule: rule.code, severity: effective.severity, field: rule.field, hint: rule.hint, title: item.title, excerpt: excerptText(rule.excerpt?.(item, context) ?? '') };
+      const finding: Finding = { item_id: item.id, rule: rule.code, rule_version: RULE_VERSION, source_digest: sourceDigest(item), disposition: 'new', severity: effective.severity, field: rule.field, hint: rule.hint, title: item.title, excerpt: excerptText(rule.excerpt?.(item, context) ?? '') };
+      if (baseline !== undefined && isAcknowledged(finding, baseline)) finding.disposition = 'debt';
       findings.push(finding);
       summary[rule.code][effective.severity] += 1;
     }
   }
   findings.sort(/** Keep host output deterministic independently of tracker scan ordering. */ (left, right) => left.item_id.localeCompare(right.item_id) || left.rule.localeCompare(right.rule));
-  return { findings, count: findings.length, scanned: selected.length, corpus_count: corpus.items.length, summary, complete_list: corpus.complete_list, fail_on: config.failOn, exit_code: findings.some(/** Exit policy includes the configured threshold and every higher severity. */ finding => SEVERITY_RANK[finding.severity] >= SEVERITY_RANK[config.failOn]) ? 1 : 0 };
+  const debtCount = findings.filter(/** Retain acknowledged debt in the ordinary finding rows. */ finding => finding.disposition === 'debt').length;
+  const staleCount = baseline === undefined ? 0 : baseline.acknowledgments.length - debtCount;
+  const failed = findings.some(/** Baseline gates fail every new finding; ordinary lint retains severity policy. */ finding => baseline === undefined ? SEVERITY_RANK[finding.severity] >= SEVERITY_RANK[config.failOn] : finding.disposition === 'new');
+  return { findings, debt_count: debtCount, new_count: findings.length - debtCount, stale_count: staleCount, count: findings.length, scanned: selected.length, corpus_count: corpus.items.length, summary, complete_list: corpus.complete_list, fail_on: baseline === undefined ? config.failOn : 'info', exit_code: failed ? 1 : 0 };
 }
