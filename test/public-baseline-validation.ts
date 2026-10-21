@@ -41,8 +41,9 @@ try {
   await cp(pmRoot, copy, { recursive: true });
   await writable(copy);
   const copyClient = new PmClient({ pmRoot: copy, cwd: scratch, author: 'validation-agent', noExtensions: true });
-  const target = observed.findings.find(row => row.rule !== 'PML008');
-  assert.ok(target, 'The public source must contain a finding to invalidate');
+  // Description edits can resolve PML008; refreshed activity resolves PML005.
+  const target = observed.findings.find(row => row.rule !== 'PML008' && row.rule !== 'PML005');
+  assert.ok(target, 'The public source must contain a finding unaffected by description and activity updates');
   await copyClient.update(target.item_id, { description: 'Public baseline source-change validation probe' });
   const changed = await lintItems(copyClient, copy, { baseline });
   assert.ok(changed.stale_count > 0);

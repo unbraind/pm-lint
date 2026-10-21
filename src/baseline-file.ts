@@ -43,6 +43,7 @@ async function publishBaseline(lock: FileHandle, path: string, findings: readonl
   try {
     const baseline = acknowledgeFinding(findings, await readBaseline(path, true), request);
     await lock.writeFile(`${JSON.stringify(baseline, null, 2)}\n`);
+    await lock.sync();
     await lock.close();
     await rename(lockPath, path);
     published = true;

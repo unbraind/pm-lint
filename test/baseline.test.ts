@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { registerHooks } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { activateExtensionForTest, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -155,6 +157,55 @@ test('baseline files create atomically, retain debt, fail closed and serialize w
   await assert.rejects(acknowledgeBaselineFile(destination, result.findings, request), refusal('baseline_io'));
 });
 
+test('baseline publication syncs complete bytes before replacement and preserves debt on sync failure', async t => {
+  const { client, pmRoot, root } = await tracker(t);
+  await client.create({ type: 'Task', title: 'Preserve previously acknowledged debt' });
+  const { findings } = await lintItems(client, pmRoot);
+  const row = findings[0];
+  const request: Acknowledgment = { item_id: row.item_id, rule: row.rule, rule_version: row.rule_version, source_digest: row.source_digest, reason: evidence.reason };
+  const path = join(root, 'baseline.json');
+  const previous = `${JSON.stringify(empty)}\n`;
+  await writeFile(path, previous);
+  const handle = await open(join(root, 'sync-probe'), 'w');
+  t.after(() => handle.close());
+  const prototype: typeof handle = Object.getPrototypeOf(handle);
+  const originalSync = prototype.sync;
+  const sync = t.mock.method(prototype, 'sync', async function (this: typeof handle) {
+    assert.deepEqual(JSON.parse(await readFile(`${path}.lock`, 'utf8')), { version: 1, acknowledgments: [request] });
+    assert.equal(await readFile(path, 'utf8'), previous, 'the old baseline remains published until sync completes');
+    await originalSync.call(this);
+  });
+  await acknowledgeBaselineFile(path, findings, request);
+  assert.equal(sync.mock.callCount(), 1);
+  sync.mock.restore();
+  const published = await readFile(path, 'utf8');
+  const failure = t.mock.method(prototype, 'sync', async () => { throw new Error('sync failed'); });
+  await assert.rejects(acknowledgeBaselineFile(path, findings, { ...request, reason: 'Updated rationale' }), refusal('baseline_io'));
+  assert.equal(failure.mock.callCount(), 1);
+  failure.mock.restore();
+  assert.equal(await readFile(path, 'utf8'), published);
+  await assert.rejects(readFile(`${path}.lock`), { code: 'ENOENT' });
+});
+
+test('public validation skips a leading stale-only finding and invalidates persistent debt', async t => {
+  const { client, root, pmRoot } = await tracker(t);
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2000-01-01T00:00:00Z') });
+  try {
+    const first = (await client.create({ type: 'Task', title: 'Record overdue project activity' })).item;
+    const second = (await client.create({ type: 'Task', title: 'Specify baseline repair criteria' })).item;
+    const [stale] = [first, second].sort((left, right) => left.id.localeCompare(right.id));
+    await client.update(stale.id, { status: 'in_progress', acceptanceCriteria: 'The activity check reports recent progress' });
+  } finally {
+    t.mock.timers.reset();
+  }
+  assert.deepEqual((await lintItems(client, pmRoot)).findings.map(row => row.rule), ['PML005', 'PML002']);
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./public-baseline-validation.ts', import.meta.url)), pmRoot], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(root), PM_PATH: pmRoot } });
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(result.stdout) as { changed: { debt: number; new: number; stale: number; exit: number }; source_bytes_unchanged: boolean };
+  assert.deepEqual(receipt.changed, { debt: 1, new: 1, stale: 1, exit: 1 });
+  assert.equal(receipt.source_bytes_unchanged, true);
+});
+
 test('host command returns typed refusals, observed evidence and compact debt counts', async t => {
   const previousExit = process.exitCode;
   t.after(() => { process.exitCode = previousExit; });
@@ -190,10 +241,21 @@ test('host command returns typed refusals, observed evidence and compact debt co
 test('new baseline SDK and command paths work in a non-git tracker with no git executable', async t => {
   const { client, root, pmRoot } = await tracker(t);
   await client.create({ type: 'Task', title: 'Validate standalone tracker context' });
+  const publicSdk = import.meta.resolve('@unbrained/pm-cli/sdk');
+  const relocatedSdk = pathToFileURL(join(root, 'public-sdk.mjs')).href;
+  await writeFile(new URL(relocatedSdk), `export { PmClient } from ${JSON.stringify(publicSdk)}; console.error('public-sdk-export-loaded');`);
+  // Simulate a changed public export target while retaining the actual SDK client.
+  const hooks = registerHooks({
+    /** Relocate only the public SDK specifier, leaving all other resolution intact. */
+    resolve(specifier, context, nextResolve) {
+      return specifier === '@unbrained/pm-cli/sdk' ? { url: relocatedSdk, shortCircuit: true } : nextResolve(specifier, context);
+    },
+  });
+  t.after(() => hooks.deregister());
   const script = `
     import { lintItems } from ${JSON.stringify(new URL('../src/engine.ts', import.meta.url).href)};
     import { runAcknowledgeCommand, renderLintCommand } from ${JSON.stringify(new URL('../src/commands.ts', import.meta.url).href)};
-    import { PmClient } from ${JSON.stringify(new URL('../node_modules/@unbrained/pm-cli/dist/sdk/index.js', import.meta.url).href)};
+    import { PmClient } from ${JSON.stringify(import.meta.resolve('@unbrained/pm-cli/sdk'))};
     const [root, pmRoot] = process.argv.slice(1);
     const client = new PmClient({cwd: root, pmRoot, noExtensions: true});
     const initial = await lintItems(client, pmRoot, {baseline: {version: 1, acknowledgments: []}});
@@ -204,8 +266,10 @@ test('new baseline SDK and command paths work in a non-git tracker with no git e
     ctx.options = {baseline: root + '/baseline.json'};
     console.log(JSON.stringify(await renderLintCommand(ctx)));
   `;
+  hooks.deregister();
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', script, root, pmRoot], { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: resolve(root, 'no-executables'), GIT_CEILING_DIRECTORIES: dirname(root), PM_PATH: pmRoot } });
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /public-sdk-export-loaded/);
   const receipt = JSON.parse(result.stdout) as { debt_count: number; new_count: number };
   assert.equal(receipt.debt_count, 1);
   assert.equal(receipt.new_count, 0);
