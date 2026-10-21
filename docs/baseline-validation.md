@@ -30,3 +30,5 @@ GIT_CEILING_DIRECTORIES=<temporary-parent> \
 ```
 
 The script reads the snapshot, acknowledges each exact finding in memory, checks retained debt, then changes one item in a separate disposable copy. Its output contains aggregate counts only. The test suite separately exercises the SDK and acknowledgment command in a plain-directory tracker with a PATH containing no git executable. Packed acceptance checks both npm/npx and native Bun/bunx acknowledgment and baseline verdicts in CI.
+
+Implementation CI at `c3501f8d9c4e20895ae25caea180d967bb333da9`: [successful run](https://github.com/unbraind/pm-lint/actions/runs/39669360702). Node 22 and Node 26 npm gates each passed 86 suite tests and one packed acceptance test (covering npm/npx and native Bun/bunx). The Node 26 `bun run release:check` passed another 86 suite tests and one packed acceptance test. Each full coverage evaluation reported all 17 required source files at 100% statements, branches, functions and lines. Thresholds were unchanged. Docstrings covered 47 declarations; duplication was zero. Synthetic failure output inside tooling-gate tests is expected; each outer suite passed with zero failures.
