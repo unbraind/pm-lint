@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { activateExtensionForTest, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
+import type { Finding } from '../src/types.ts';
 import extension, { acknowledgeFinding, BaselineRefusal, parseBaseline, sourceDigest } from '../index.ts';
 import type { Acknowledgment, LintBaseline } from '../index.ts';
 import { assertBaselinePolicy, isAcknowledged } from '../src/baseline.ts';
@@ -23,6 +24,11 @@ const evidence: Acknowledgment = { item_id: 'pm-example-abcd', rule: 'PML002', r
 /** Assert machine-readable refusals carry a nonempty recovery action. */
 function refusal(code: string): (error: unknown) => boolean {
   return error => error instanceof BaselineRefusal && error.code === code && error.remedy.length > 0;
+}
+
+/** Copy only observed evidence fields and the shared rationale into a request. */
+function acknowledgment(row: Finding): Acknowledgment {
+  return { item_id: row.item_id, rule: row.rule, rule_version: row.rule_version, source_digest: row.source_digest, reason: evidence.reason };
 }
 
 test('strict portable baseline parser refuses malformed, broad and duplicate acknowledgments', () => {
@@ -127,8 +133,7 @@ test('baseline files create atomically, retain debt, fail closed and serialize w
   const { client, pmRoot, root } = await tracker(t);
   await client.create({ type: 'Task', title: 'Retain a legacy debt' });
   const result = await lintItems(client, pmRoot);
-  const row = result.findings[0];
-  const request: Acknowledgment = { item_id: row.item_id, rule: row.rule, rule_version: row.rule_version, source_digest: row.source_digest, reason: evidence.reason };
+  const request = acknowledgment(result.findings[0]);
   const path = join(root, 'baseline.json');
   await assert.rejects(readBaseline(path), refusal('baseline_io'));
   const baseline = await acknowledgeBaselineFile(path, result.findings, request);
@@ -161,8 +166,7 @@ test('baseline publication syncs complete bytes before replacement and preserves
   const { client, pmRoot, root } = await tracker(t);
   await client.create({ type: 'Task', title: 'Preserve previously acknowledged debt' });
   const { findings } = await lintItems(client, pmRoot);
-  const row = findings[0];
-  const request: Acknowledgment = { item_id: row.item_id, rule: row.rule, rule_version: row.rule_version, source_digest: row.source_digest, reason: evidence.reason };
+  const request = acknowledgment(findings[0]);
   const path = join(root, 'baseline.json');
   const previous = `${JSON.stringify(empty)}\n`;
   await writeFile(path, previous);
