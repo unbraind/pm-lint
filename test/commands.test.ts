@@ -9,14 +9,14 @@ import type { LintResult } from '../src/engine.ts';
 import { tracker } from './helpers.ts';
 
 /** Exercise actual extension activation and dispatch with a real tracker. */
-test('host activation exposes two read commands and preserves lint receipt exit status', async t => {
+test('host activation exposes lint commands and preserves lint receipt exit status', async t => {
   const previousExit = process.exitCode;
   t.after(/** SDK host exit control is process-global even in its testing dispatcher. */ () => { process.exitCode = previousExit; });
   const { client, pmRoot } = await tracker(t);
   const item = (await client.create({ title: 'TODO', type: 'Task' })).item;
   const activation = await activateExtensionForTest(extension, { name: 'pm-lint', capabilities: ['commands', 'schema'] });
   assert.deepEqual(activation.failed, []);
-  assert.equal(activation.commands.handlers.length, 2);
+  assert.equal(activation.commands.handlers.length, 3);
   const lint = assertRegisteredCommandContract(activation.registrations, { command: 'lint', flags: ['--rule', '--disable', '--id', '--severity', '--fail-on', '--type', '--status', '--since'] });
   for (const flag of lint.flags) {
     assert.ok((flag.description ?? '').length > 0, `${flag.long} carries a help description`);

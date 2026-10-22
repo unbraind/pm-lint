@@ -1,9 +1,11 @@
 import { getSettingsPath, readFileIfExists, readSettings } from '@unbrained/pm-cli/sdk';
 import { RULES } from './rules.ts';
 import type { LintConfig, RuleCode, RuleConfig, RuleScope, Severity } from './types.ts';
+import type { LintBaseline } from './baseline.ts';
 
 /** CLI overrides and item filters accepted by both extension and embedded callers. */
 export interface LintOptions {
+  baseline?: LintBaseline;
   rule?: string[];
   disable?: string[];
   severity?: string;

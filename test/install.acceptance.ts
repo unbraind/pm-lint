@@ -175,6 +175,17 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.equal(disabled.verdict.scanned, initial.verdict.scanned, 'selection is independent of rule enablement');
     assert.equal(disabled.verdict.corpus_count, initial.verdict.corpus_count, 'certification is independent of rule enablement');
     assert.equal(disabled.status, 0, 'an empty verdict exits successfully');
+    // Exercise packed baseline writes and reads through each real CLI runtime.
+    const baselinePath = join(cwd, 'lint-baseline.json');
+    const observed = initial.verdict.findings as unknown as { item_id: string; rule: string; rule_version: string; source_digest: string }[];
+    for (const finding of observed) {
+      const acknowledged = JSON.parse(command(cwd, runner, [...prefix, '--json', 'lint', 'acknowledge', '--baseline', baselinePath, '--id', finding.item_id, '--rule', finding.rule, '--reason', 'Accepted specific legacy debt', '--rule-version', finding.rule_version, '--source-digest', finding.source_digest], pmRoot)) as { ok: boolean };
+      assert.equal(acknowledged.ok, true);
+    }
+    const baselineRead = jsonRead(cwd, runner, prefix, pmRoot, [], ['--baseline', baselinePath]);
+    assert.equal(baselineRead.status, 0);
+    assert.equal(baselineRead.data.debt_count, observed.length);
+    assert.equal(baselineRead.data.new_count, 0);
     // Budget compaction returns a resumable continuation cursor for the findings rows.
     const fixtureClient = new PmClient({ cwd, pmRoot, author: 'install-test', noExtensions: true });
     for (let index = 2; index <= 5; index += 1) {
@@ -182,6 +193,10 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
       await fixtureClient.create({ type: 'Feature', title, description: title, acceptanceCriteria: 'works', allowDuplicate: true });
     }
     const full = lintRaw(cwd, runner, prefix, pmRoot, []);
+    const regressed = jsonRead(cwd, runner, prefix, pmRoot, [], ['--baseline', baselinePath]);
+    assert.equal(regressed.status, 1);
+    assert.equal(regressed.data.debt_count, observed.length);
+    assert.ok(Number(regressed.data.new_count) > 0);
     const fullIds = (full.findings as { item_id: string; rule: string }[]).map(row => `${row.item_id}:${row.rule}`).sort();
     assert.ok(fullIds.length >= 10, 'the grown corpus carries enough findings to compact');
     assert.deepEqual(continuationRows(cwd, runner, prefix, pmRoot, [], 'findings', 'item_id'), fullIds, 'finding continuations cover the full verdict');

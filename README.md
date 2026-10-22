@@ -42,6 +42,31 @@ The commands use the host renderer: TOON by default and global `--json` for auto
 
 `pm lint rules` lists each rule's code, default severity, default scope, field, description, hint and settings key.
 
+## Evidence-backed baselines
+
+Use a baseline to keep specific old findings visible while failing every new finding. Each finding now includes `rule_version`, a SHA-256 `source_digest` of its full canonical source item, and `disposition` (`new` or `debt`). Digests include all item metadata and full text, including text beyond the displayed excerpt. Any source-item change invalidates its acknowledgments; unrelated new items preserve existing debt. Rule semantics changes require a `RULE_VERSION` increment and invalidate older evidence.
+
+```sh
+pm lint --json --output-include item_id,rule,rule_version,source_digest
+# Copy one observed finding's identity, version and digest; review its full source.
+pm lint acknowledge --baseline lint-baseline.json \
+  --id project-abcd --rule PML002 --reason 'Legacy criteria debt; repair scheduled' \
+  --rule-version 1 --source-digest <observed-sha256>
+pm lint --baseline lint-baseline.json --json
+pm lint --baseline lint-baseline.json \
+  --output-include item_id,rule,disposition --output-budget 2000
+```
+
+Acknowledgment creates or updates only the named JSON file. It rechecks the complete tracker and refuses missing findings or changed evidence. A nonempty reason of at most 1,000 characters is required. There is no bulk acknowledgment or wildcard. Commit the reviewable baseline file alongside the policy decision. Cooperating CLI writers use an exclusive lock and atomic replacement; a busy lock returns a retry remedy. Do not edit the file concurrently with a command.
+
+The baseline gate requires the complete tracker and all ten default rules. It refuses selection flags, severity/failure-threshold overrides, disabled rules and nondefault lint settings with `unsafe_policy`; restore default settings before using it. Output retains **all** findings and the ordinary per-rule summary, adds `debt_count`, `new_count`, `stale_count`, and labels each row. `stale_count` includes resolved findings and obsolete evidence; stale entries never count as debt. Exit `0` means no new findings, `1` means new findings at **any** severity (`fail_on: info`), and `2` is a typed baseline refusal with `code`, `message` and `remedy`. Malformed or missing baseline files fail closed. Host projection and continuation controls apply to baseline checks too.
+
+The SDK exports `LintBaseline`, `Acknowledgment`, `BaselineRefusal`, `parseBaseline`, `sourceDigest`, `RULE_VERSION` and `acknowledgeFinding`. `lintItems(client, pmRoot, { baseline })` uses the same complete gate on any SDK tracker backend. SDK baseline refusals throw `BaselineRefusal`; the CLI renders them as compact TOON or JSON. See [the SDK example](docs/baseline-example.md) and [public-data validation](docs/baseline-validation.md). A baseline records an explicit authoring-debt decision; it does not certify that the finding or its reason is true.
+
+## Without git
+
+Linting, rule listing, acknowledgment and baseline checks work in plain directory trackers without a git executable. These commands do not require repository history. The SDK baseline model is independent of git and tracker storage; CLI baseline files use the local filesystem.
+
 | Code | Default severity | Default scope | Field | Checks |
 | --- | --- | --- | --- | --- |
 | PML001 | warn | non_terminal | title | Placeholder, under three words, or ticket-only title |
