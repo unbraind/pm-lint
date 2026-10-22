@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
+import type { ItemMetadata, LinkedTest } from '@unbrained/pm-cli/sdk';
 import type { Finding, LintConfig, RuleCode } from './types.ts';
 import type { LintOptions } from './settings.ts';
 
@@ -39,8 +39,8 @@ export class BaselineRefusal extends Error {
   }
 }
 
-/** Hash the full canonical item, including text beyond displayed excerpt limits. */
-export function sourceDigest(item: ItemMetadata): string {
+/** Hash a full canonical item or linked test, including text beyond display limits. */
+export function sourceDigest(item: ItemMetadata | LinkedTest): string {
   const source = JSON.stringify(item, /** Sort nested object keys while retaining array order. */ (_key, value: unknown) => {
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) return Object.fromEntries(Object.keys(value).sort().map(/** Canonical keys use locale-independent ordering. */ key => [key, (value as Record<string, unknown>)[key]]));
     return value;

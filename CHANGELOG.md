@@ -4,6 +4,7 @@
 
 ### Added
 
+- Validate declared acceptance criterion witnesses without executing code ([pm-lint-criterion-witnesses](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-criterion-witnesses.toon))
 - Acknowledge lint debt with source-bound evidence ([pm-lint-lint-baselines](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-lint-baselines.toon))
 - Certify complete tracker lint reads ([pm-lint-engine](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-engine.toon))
 - Register host rendered lint command ([pm-lint-cli](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-cli.toon))

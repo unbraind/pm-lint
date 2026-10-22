@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { PmClient } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, splitAcceptanceCriteria } from '@unbrained/pm-cli/sdk';
 
 /** One lint verdict as rendered by the packed extension command. */
 interface LintVerdict {
@@ -209,6 +210,24 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.equal(toon.error, undefined);
     assert.ok(toon.stdout.length > 0, 'the default rendering is host TOON, not silence');
     assert.equal(toon.status, initial.verdict.exit_code ?? 0, 'TOON and JSON renderings share one exit contract');
+    // The packed witness SDK and command retain exact citations in both runtimes.
+    const proof = (await fixtureClient.create({ type: 'Task', title: 'Preserve packed witness citations', acceptanceCriteria: 'Output preserves the exact citation path' })).item;
+    const bytes = 'Verified synthetic citation observation\n';
+    await writeFile(join(cwd, 'proof.txt'), bytes);
+    const corpus = certifyCompleteListResult(await fixtureClient.listAllComplete());
+    const bindings = corpus.items.flatMap(item => splitAcceptanceCriteria(item.acceptance_criteria).map(criterion => ({ item_id: item.id, criterion, witnesses: item.id === proof.id ? [{ kind: 'observation', path: 'proof.txt#L1', sha256: createHash('sha256').update(bytes).digest('hex'), outcome: 'pass' }] : [{ kind: 'pending', reason: 'Other synthetic criteria await proof' }] })));
+    const witnessPath = join(cwd, 'witnesses.json');
+    await writeFile(witnessPath, JSON.stringify({ version: 1, bindings }));
+    const witness = jsonRead(cwd, runner, prefix, pmRoot, ['witnesses'], ['--contract', witnessPath]);
+    assert.equal(witness.status, 1, 'explicit pending proof remains unfinished');
+    assert.equal((witness.data.summary as { supported: number }).supported, 1);
+    const citation = (witness.data.findings as { item_id: string; citation: string }[]).find(row => row.item_id === proof.id);
+    assert.equal(citation?.citation, 'proof.txt#L1');
+    const witnessToon = runConsumer(cwd, runner, [...prefix, 'lint', 'witnesses', '--contract', witnessPath], pmRoot);
+    assert.equal(witnessToon.status, 1);
+    assert.match(witnessToon.stdout, /proof\.txt#L1/);
+    await writeFile(join(cwd, 'witness-sdk.mjs'), `import { lintWitnesses, parseWitnessContract, observationDigest, WitnessRefusal } from 'pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nimport { readFile } from 'node:fs/promises';\nconst contract = parseWitnessContract(JSON.parse(await readFile('witnesses.json', 'utf8')));\nconst result = await lintWitnesses(new PmClient({cwd: '.', pmRoot: '.agents/pm', noExtensions: true}), contract, '.');\nif (result.summary.supported !== 1 || observationDigest('a').length !== 64 || typeof WitnessRefusal !== 'function') throw new Error('Packed witness SDK contract failed');\nconsole.log('packed-witness-sdk-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['witness-sdk.mjs'], pmRoot), /packed-witness-sdk-ok/);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });
