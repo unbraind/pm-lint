@@ -122,8 +122,9 @@ UTF-16 `item_id`, `criterion`, `citation`, then `state`, independently of host l
 and declaration order. Unicode spellings are never normalized. Counts and summary
 cover the full evaluation; host projection, budgets, row limits and cursor
 continuations apply. `count` counts finding rows, `criteria_count` counts stored
-criteria, and `corpus_count` counts certified items. Exit `0` means every criterion
-has only supported declarations (or the tracker has no criteria), `1` means any
+criteria, and `corpus_count` counts certified items. Exit `0` means every finding is
+`supported`, including when the tracker has no criteria (a contract binding for a
+removed item still emits `dangling` and exits `1`), `1` means any
 unfinished/invalid proof, and `2` means a typed refusal with `code`, `message` and
 `remedy`. SDK input/I/O refusals throw `WitnessRefusal`; incomplete tracker reads
 remain SDK errors and never become a passing empty corpus.
