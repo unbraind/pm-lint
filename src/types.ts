@@ -13,6 +13,12 @@ export type RuleCode = `PML00${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}` | 'PML010';
 export type RuleScope = 'all' | 'non_terminal' | 'active' | 'terminal' | 'closed' | 'canceled' | 'open' | 'in_progress' | 'blocked';
 /** One diagnostic with the offending context: the item title and a bounded excerpt. */
 export interface Finding {
+  /** Rule semantics version used to validate acknowledgment evidence. */
+  rule_version: string;
+  /** SHA-256 over the full canonical source item, never the bounded excerpt. */
+  source_digest: string;
+  /** Acknowledged findings stay in output but do not fail a baseline gate. */
+  disposition: 'debt' | 'new';
   item_id: string;
   rule: RuleCode;
   severity: Severity;
