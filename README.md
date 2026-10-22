@@ -63,9 +63,80 @@ The baseline gate requires the complete tracker and all ten default rules. It re
 
 The SDK exports `LintBaseline`, `Acknowledgment`, `BaselineRefusal`, `parseBaseline`, `sourceDigest`, `RULE_VERSION` and `acknowledgeFinding`. `lintItems(client, pmRoot, { baseline })` uses the same complete gate on any SDK tracker backend. SDK baseline refusals throw `BaselineRefusal`; the CLI renders them as compact TOON or JSON. See [the SDK example](docs/baseline-example.md) and [public-data validation](docs/baseline-validation.md). A baseline records an explicit authoring-debt decision; it does not certify that the finding or its reason is true.
 
+## Acceptance-criterion witnesses
+
+`pm lint witnesses --contract criterion-witnesses.json` checks the declared link
+from **every** stored criterion to a linked test, a file observation, or explicitly
+pending proof. It never runs code, reads a Git history, fetches URLs, or guesses
+that prose establishes support. Core SDK criteria parsing and certified complete
+reads apply to every lifecycle status, including closed and canceled items.
+
+```sh
+pm lint witnesses --contract criterion-witnesses.json --json
+pm lint witnesses --contract criterion-witnesses.json \
+  --output-include item_id,criterion,state,citation --output-budget 2000
+```
+
+The strict version 1 JSON contract contains `bindings`, each with `item_id`, exact
+`criterion` text, and a nonempty `witnesses` array. Unknown keys and duplicate
+item/criterion bindings refuse. Criteria use core's semicolon boundaries; exact
+text identity survives reordering and unrelated item edits. Every criterion
+without a binding reports `missing`, even if its item contains tests or comments.
+
+| Witness kind | Required fields beyond `kind` | Meaning |
+| --- | --- | --- |
+| `test` | `command` and/or `path`, `sha256`, `outcome` | Match one exact linked-test declaration; `sourceDigest(test)` binds all metadata, including provenance and assertions |
+| `observation` | `path`, `sha256`, `outcome` | Hash the exact local artifact bytes with `observationDigest(bytes)` |
+| `pending` | `reason` | Explicitly unfinished proof with a nonblank reason |
+
+Test and observation outcomes are explicitly declared `pass` or `fail`. A
+`supported` row means the reference and digest match the declaration. It does
+**not** certify that a test ran, that an observation proves the criterion, or
+that a claimed outcome is true. Digest refreshes require evidence review.
+`pending` is visible unfinished work and always fails the gate.
+
+| State | Interpretation |
+| --- | --- |
+| `supported` | Evidence reference and complete digest match a declared pass |
+| `pending` | Proof is explicitly deferred |
+| `missing` | Current criterion has no declared binding |
+| `dangling` | Referenced item, linked test, or file does not exist |
+| `stale` | Criterion text was removed/changed, or referenced evidence digest changed |
+| `contradictory` | Outcome declares failure against the criterion, or test identity is ambiguous |
+
+Each witness produces a row. A failing outcome plus stale/dangling evidence
+produces both findings so neither condition hides the other. Mixed pass/fail
+witnesses remain contradictory; passing evidence cannot suppress any failure or
+pending proof. Removed-item bindings are dangling; removed-criterion bindings
+are stale, and replacement criteria remain missing until explicitly bound.
+
+Observation paths are relative to the evidence workspace. They retain exact
+citation spelling, including `:line[:column]` or `#Lline[-Lline]`; the digest
+covers the whole file. Traversal, absolute observation paths and symlinks escaping
+the workspace refuse. Missing files are dangling; unreadable artifacts refuse.
+Test paths are exact tracker identities, with no filesystem lookup.
+
+The host renders TOON by default or JSON with `--json`. `findings` rows carry
+`item_id`, `criterion`, `state`, exact `citation`, and a remedy. Counts and summary
+cover the full evaluation; host projection, budgets, row limits and cursor
+continuations apply. `count` counts finding rows, `criteria_count` counts stored
+criteria, and `corpus_count` counts certified items. Exit `0` means every criterion
+has only supported declarations (or the tracker has no criteria), `1` means any
+unfinished/invalid proof, and `2` means a typed refusal with `code`, `message` and
+`remedy`. SDK input/I/O refusals throw `WitnessRefusal`; incomplete tracker reads
+remain SDK errors and never become a passing empty corpus.
+
+SDK exports include `lintWitnesses(client, contract, evidenceRoot)`,
+`parseWitnessContract`, `readWitnessContract`, `observationDigest`,
+`WitnessRefusal`, and typed contract/result interfaces. The sidecar and artifacts
+are caller-owned local inputs; the client can target any supported tracker
+backend. No witness command changes tracker data. See the
+[SDK and JSON example](docs/witness-example.md) and
+[public tracker validation](docs/witness-validation.md).
+
 ## Without git
 
-Linting, rule listing, acknowledgment and baseline checks work in plain directory trackers without a git executable. These commands do not require repository history. The SDK baseline model is independent of git and tracker storage; CLI baseline files use the local filesystem.
+Linting, rule listing, acknowledgment, baseline checks and witness checks work in plain directory trackers without a git executable. These commands do not require repository history. The SDK baseline model is independent of git and tracker storage; CLI baseline files use the local filesystem.
 
 | Code | Default severity | Default scope | Field | Checks |
 | --- | --- | --- | --- | --- |

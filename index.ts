@@ -1,6 +1,12 @@
 import { defineExtension } from '@unbrained/pm-cli/sdk/authoring';
 import type { ExtensionApi } from '@unbrained/pm-cli/sdk/authoring';
 import { registerLintCommand } from './src/commands.ts';
+import { registerWitnessCommand } from './src/witness-command.ts';
+
+/** Expose portable acceptance witness validation and strict contract parsing. */
+export { lintWitnesses, parseWitnessContract, readWitnessContract, observationDigest, WitnessRefusal } from './src/witnesses.ts';
+/** Expose explicit criterion, evidence, refusal and receipt contracts. */
+export type { CriterionWitness, CriterionBinding, WitnessContract, WitnessState, WitnessFinding, WitnessResult, WitnessRefusalCode } from './src/witnesses.ts';
 
 /** Expose portable evidence-backed baseline operations and typed refusals. */
 export { acknowledgeFinding, BaselineRefusal, parseBaseline, RULE_VERSION, sourceDigest } from './src/baseline.ts';
@@ -26,5 +32,5 @@ export type { RuleListing, RulesResult } from './src/commands.ts';
 export default defineExtension({
   name: 'pm-lint', version: '2026.10.13', description: 'Authoring-quality rules for useful pm context',
   /** Register one observational command; the package never mutates items. */
-  activate(api: ExtensionApi): void { registerLintCommand(api); },
+  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); },
 });

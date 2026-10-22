@@ -1,0 +1,35 @@
+id: pm-lint-criterion-witnesses
+title: Validate declared acceptance criterion witnesses without executing code
+description: "Lint an explicit versioned criterion-to-evidence contract using certified SDK item reads. Keep dangling, stale and contradictory witnesses distinct and preserve exact citation paths in plain directories."
+type: Feature
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-22T16:06:03.295Z"
+updated_at: "2026-10-22T16:21:23.119Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+acceptance_criteria: "Dangling, stale and contradictory witnesses are distinct; Plain-directory fixtures retain exact citation paths; Typed SDK and CLI expose compact TOON and JSON with actionable refusals; Read-only public tracker validation and npm plus Bun CI release gates are recorded"
+comments[4]{created_at,author,text}:
+  "2026-10-22T16:06:45.405Z",codex-agent,"Overlap recheck: installed core SDK and LINKED_TEST_EDITS.md own linked-test declaration, mutation and execution; core splitAcceptanceCriteria owns semicolon boundaries and certified listAllComplete owns complete tracker reads. pm-context README describes deterministic context packs and receipt usage. pm-review owns GitHub review rounds. None exposes a declared per-criterion witness lint contract. Scope: add a strict versioned sidecar contract, read-only lint witnesses command and typed SDK; do not run linked commands, infer proof from prose, or duplicate core criteria parsing. Existing PML002 remains authoring-quality presence checking."
+  "2026-10-22T16:12:34.660Z",codex-agent,"Implementation uses SDK splitAcceptanceCriteria and certifyCompleteListResult(listAllComplete), and reuses canonical sourceDigest for complete linked-test metadata. A strict version 1 sidecar binds exact criterion text to command+digest, file citation+byte digest, or pending reason. All criteria, including terminal history, remain in scope. Pending never passes. Source item/comment prose is never inferred as proof. Observation paths retain exact spelling while resolved containment rejects traversal and symlink escapes. Focused coverage reached 100 percent in all four dimensions for both new modules. CLI integration exposed that read_output refusal receipts must retain the declared findings array; included it so typed remedies survive host rendering."
+  "2026-10-22T16:18:06.728Z",codex-agent,"Public-data validation: public pm-context main snapshot 7d156cd179b1a02a4023d0c8690dcba7d8594c81, 80 certified items, 46 with criteria, 176 criteria, 82 linked tests (not executed). Non-git read-only snapshot, empty executable PATH, 167 of 167 tracker-file hashes unchanged. Empty contract: 176 missing and exit 1. Generated explicit-pending sidecar: 176 pending, zero missing and exit 1. No existing tests or prose were inferred as proof. Behavioral revert: disable finding emission within lintWitnesses only and rebuild; targeted SDK state regression and built CLI exact-citation regression both fail (0 pass, 2 fail). Restored original function and rebuilt. Pinned SDK writer gap: path-only LinkedTest is valid in the public type/read model but create --test and test --add-json both demand a command; a real SDK imported tracker fixture verifies legacy path-only support without changing the dependency pin."
+  "2026-10-22T16:21:23.119Z",codex-agent,"Local verification: pm test --run --progress passed both linked commands: 23 targeted tests (zero failures/skips) plus typecheck, lint, zero-duplication and 60/60 documented declarations. Focused witness coverage: nine tests, 100/100/100/100 across both new modules. Initial linked run exposed inherited source-workspace coordinates in a nested CLI fixture; fixture now explicitly isolates workspace and global-profile coordinates and the repeated linked run passes. CI now calls the exact npm release:check entrypoint instead of duplicating its component steps, retains explicit identity enforcement and the Node 22/26 matrix, and retains the Bun release:check gate on Node 26. Full gates run in CI to respect the saturated host."
+files[8]{path,scope}:
+  .github/workflows/ci.yml,project
+  index.ts,project
+  src/baseline.ts,project
+  src/witness-command.ts,project
+  src/witnesses.ts,project
+  test/commands.test.ts,project
+  test/install.acceptance.ts,project
+  test/witnesses.test.ts,project
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test test/witnesses.test.ts test/commands.test.ts test/baseline.test.ts,project,codex-agent,"2026-10-22T16:18:07.657Z",local_mutation,feat/criterion-witnesses
+  npm run typecheck && npm run lint && npm run duplication && npm run docstring,project,codex-agent,"2026-10-22T16:18:07.657Z",local_mutation,feat/criterion-witnesses
+docs[3]{path,scope}:
+  docs/witness-example.md,project
+  docs/witness-validation.md,project
+  README.md,project
+body: ""
