@@ -117,7 +117,9 @@ the workspace refuse. Missing files are dangling; unreadable artifacts refuse.
 Test paths are exact tracker identities, with no filesystem lookup.
 
 The host renders TOON by default or JSON with `--json`. `findings` rows carry
-`item_id`, `criterion`, `state`, exact `citation`, and a remedy. Counts and summary
+`item_id`, `criterion`, `state`, exact `citation`, and a remedy. Rows sort by exact
+UTF-16 `item_id`, `criterion`, `citation`, then `state`, independently of host locale
+and declaration order. Unicode spellings are never normalized. Counts and summary
 cover the full evaluation; host projection, budgets, row limits and cursor
 continuations apply. `count` counts finding rows, `criteria_count` counts stored
 criteria, and `corpus_count` counts certified items. Exit `0` means every criterion

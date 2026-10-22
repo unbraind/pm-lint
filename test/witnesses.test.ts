@@ -90,6 +90,33 @@ test('current linked tests bind all metadata and ambiguous identities contradict
   assert.equal(missing.summary.dangling, 1);
 });
 
+test('witness ordering uses exact strings across Unicode criteria, citations and reversed declarations', async t => {
+  const { client, root } = await tracker(t);
+  const decomposed = 'e\u0301 proof';
+  const composed = '\u00e9 proof';
+  const item = (await client.create({ id: 'lint-order-a', type: 'Task', title: 'Order every exact witness identity', acceptanceCriteria: `${composed}; ${decomposed}; Z proof` })).item;
+  const other = (await client.create({ id: 'lint-order-z', type: 'Task', title: 'Order separate item identities', acceptanceCriteria: 'Other proof' })).item;
+  const paths = ['\u00e9vidence.txt:1', 'e\u0301vidence.txt:1'];
+  for (const path of paths) await writeFile(join(root, path.slice(0, -2)), 'verified\n');
+  const witnesses: CriterionWitness[] = paths.flatMap(path => ([{ ...observation, path, outcome: 'pass' }, { ...observation, path, outcome: 'fail' }]));
+  witnesses.push({ ...observation, path: paths[0] });
+  const bindings = [composed, decomposed].map(criterion => ({ item_id: item.id, criterion, witnesses }));
+  const original = await lintWitnesses(client, { version: 1, bindings }, root);
+  const reversed = await lintWitnesses(client, { version: 1, bindings: [...bindings].reverse().map(binding => ({ ...binding, witnesses: [...binding.witnesses].reverse() })) }, root);
+  assert.deepEqual(original.findings, reversed.findings, 'canonical-equivalent Unicode strings must not retain declaration order');
+  const rows = original.findings.filter(row => row.item_id === item.id);
+  assert.deepEqual([...new Set(rows.map(row => row.criterion))], ['Z proof', decomposed, composed]);
+  for (const criterion of [decomposed, composed]) {
+    const citations = rows.filter(row => row.criterion === criterion);
+    assert.deepEqual(citations.map(row => [row.citation, row.state]), [
+      [paths[1], 'contradictory'], [paths[1], 'supported'],
+      [paths[0], 'contradictory'], [paths[0], 'supported'], [paths[0], 'supported'],
+    ]);
+  }
+  assert.deepEqual(original.summary, { supported: 6, pending: 0, missing: 2, dangling: 0, stale: 0, contradictory: 4 });
+  assert.equal(original.findings.at(-1)?.item_id, other.id);
+});
+
 test('observations reject traversal and symlink escapes with typed remedies', async t => {
   const { client, root } = await tracker(t);
   const item = (await client.create({ type: 'Task', title: 'Keep observations local', acceptanceCriteria: 'Proof' })).item;

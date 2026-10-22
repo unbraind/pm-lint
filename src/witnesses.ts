@@ -136,6 +136,11 @@ const REMEDIES: Record<WitnessState, string> = {
   contradictory: 'Resolve failing or conflicting outcome declarations before claiming support.',
 };
 
+/** Compare exact UTF-16 code units without locale collation or Unicode normalization. */
+function compareWitnessText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /** Check declared contracts against certified tracker state; never execute a linked test. */
 export async function lintWitnesses(client: PmClient, contract: WitnessContract, evidenceRoot: string): Promise<WitnessResult> {
   const checked = parseWitnessContract(contract);
@@ -177,6 +182,6 @@ export async function lintWitnesses(client: PmClient, contract: WitnessContract,
     criteriaCount += entries.length;
     for (const criterion of entries) if (!bound.has(JSON.stringify([id, criterion]))) add(id, criterion, 'missing');
   }
-  findings.sort(/** Deterministic output ignores scan and contract order. */ (a, b) => a.item_id.localeCompare(b.item_id) || a.criterion.localeCompare(b.criterion) || a.citation.localeCompare(b.citation) || a.state.localeCompare(b.state));
+  findings.sort(/** Exact identity ordering ignores scan order, declaration order and host locale. */ (a, b) => compareWitnessText(a.item_id, b.item_id) || compareWitnessText(a.criterion, b.criterion) || compareWitnessText(a.citation, b.citation) || compareWitnessText(a.state, b.state));
   return { findings, count: findings.length, corpus_count: corpus.items.length, criteria_count: criteriaCount, summary, complete_list: corpus.complete_list, exit_code: findings.some(/** Explicit pending proof remains unfinished. */ row => row.state !== 'supported') ? 1 : 0 };
 }
