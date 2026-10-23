@@ -4,8 +4,8 @@
 
 ### Added
 
-- Validate declared acceptance criterion witnesses without executing code ([pm-lint-criterion-witnesses](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-criterion-witnesses.toon))
 - Acknowledge lint debt with source-bound evidence ([pm-lint-lint-baselines](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-lint-baselines.toon))
+- Validate declared acceptance criterion witnesses without executing code ([pm-lint-criterion-witnesses](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-criterion-witnesses.toon))
 - Certify complete tracker lint reads ([pm-lint-engine](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-engine.toon))
 - Register host rendered lint command ([pm-lint-cli](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-cli.toon))
 - Configure lint rules through SDK settings ([pm-lint-settings](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-settings.toon))
@@ -20,7 +20,6 @@
 
 ### Other
 
-- Build useful item authoring lint ([pm-lint-epic](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/epics/pm-lint-epic.toon))
 - Cover package tooling: gates, workflows and packed consumers ([pm-lint-vh3f](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-vh3f.toon))
 - Register merge drivers during CI install ([pm-lint-41oh](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-41oh.toon))
 - Declare the schema capability so packed command flags activate ([pm-lint-1c6j](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-1c6j.toon))
