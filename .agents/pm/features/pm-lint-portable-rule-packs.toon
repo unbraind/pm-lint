@@ -1,0 +1,33 @@
+id: pm-lint-portable-rule-packs
+title: Enforce portable organization authoring rule packs
+description: Load bounded declarative semantic item checks through a typed version 1 contract with actionable diagnostics across tracker adapters.
+type: Feature
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-23T19:37:23.673Z"
+updated_at: "2026-10-23T19:51:21.114Z"
+author: codex-agent
+acceptance_criteria: Unsafe or unbounded patterns refuse with typed remedies; Unknown contract fields fail clearly; Identical rules yield identical diagnostics across storage adapters; SDK and CLI emit compact TOON or JSON without git; Read-only public tracker validation and CI npm plus Bun release gates provide measured evidence
+parent: pm-lint-epic
+comments[4]{created_at,author,text}:
+  "2026-10-23T19:37:31.254Z",codex-agent,"Overlap rechecked against installed core SDK 2026.10.20, current published CLI 2026.10.23, pm-presets schema/settings/template export and upgrade, pm-review evidence workflows, and pm-lint rules/baselines/witnesses. Core owns field types and complete-list certification; presets distributes configuration; this feature adds read-only organization semantic checks without arbitrary execution. Plan: strict bounded version 1 JSON, literal predicates, typed remedies, adapter-independent certified reader, deterministic diagnostic ordering, CLI, docs and non-git public snapshot validation. No duplicate portable-pack item found."
+  "2026-10-23T19:43:52.351Z",codex-agent,"Current CLI overlap verified from installed 2026.10.23 declarations: core workflow policies already enforce field presence, transitions, author/field-writer rules and approvals. This pack adds observational literal text/length authoring assertions with organization explanations and remedies, never installs or overrides governance. Reuses PmClient, complete-list certification, command registration and host TOON/JSON budgeting. Public pm-presets snapshot 470c2b2a367c36dbf19513b4db2f84fa979a057c: 76 items, 3 rules, 157 applicable checks, 25 warnings, 0 errors, 0 info, 6193 JSON bytes; results identical after rule reorder and all read-only snapshot filenames/bytes unchanged. Git discovery fenced outside any repository. Targeted new-source coverage currently 100/100/100/100; completing adapter parity and regression proof before CI."
+  "2026-10-23T19:47:04.978Z",codex-agent,"Focused linked test run passed 22/22 with no skips; npm run typecheck, npm run lint, npm run docstring and npm run duplication passed. Both new runtime modules measured 100% statements, branches, functions and lines with targeted c8. Behavioral revert proof: replacing satisfies with unconditional success and rebuilding made both selected semantic and built CLI tests fail (0/2); replacing parseRulePack with an unchecked identity return and rebuilding made both parser/resource tests fail (0/2). Restored implementation and rebuilt. Real SDK TOON and legacy JSON Markdown reader receipts match exactly. Full npm and Bun release gates are delegated to CI as requested because the host is saturated. Known SDK behavior: legacy Markdown is migrated during reads; the public measurement used canonical TOON and proved read-only bytes unchanged. No unrelated CLI defects encountered."
+  "2026-10-23T19:51:19.501Z",codex-agent,"Ready PR: https://github.com/unbraind/pm-lint/pull/21 . Implementation head 3b6a590809aa72f82e1e83f742542731f732e09f passed CI https://github.com/unbraind/pm-lint/actions/runs/40014216019 : npm release:check on Node 22 and 26, Bun release:check on Node 26; each 106/106 suite tests plus 1/1 packed acceptance test, zero failed/skipped/canceled, 100/100/100/100 coverage over all 21 configured sources. Identity/privacy, duplication, typecheck, lint, docstrings, dependency audit, package, changelog and attestation checks passed. CodeQL passed. Separate local strict health had ignored extension host-version skew and pre-existing fence drift; fresh CI health passed both jobs. External automated reviewers unavailable/skipped/neutral; no approval claimed. Documenting these receipts and releasing the claim while leaving the item in_progress for orchestrator verification. The final evidence commit will receive a fresh full CI run."
+files[8]{path,scope,note}:
+  index.ts,project,Typed public SDK exports and command activation
+  src/rule-pack-command.ts,project,Host CLI adapter
+  src/rule-pack.ts,project,Strict contract and deterministic evaluator
+  test/helpers.ts,project,Shared real built-extension and git-free runner
+  test/install.acceptance.ts,project,Packed npm and native Bun acceptance
+  test/public-rule-pack-validation.ts,project,Public snapshot measurement
+  test/rule-pack.test.ts,project,Refusals and real tracker regression evidence
+  test/witnesses.test.ts,project,Reuse existing no-git test runner
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/rule-pack.test.ts test/commands.test.ts test/witnesses.test.ts,project,codex-agent,"2026-10-23T19:44:00.527Z",local_mutation,feat/portable-rule-packs
+docs[3]{path,scope,note}:
+  docs/portable-rule-packs-validation.md,project,Public aggregate measurements and evidence boundaries
+  examples/authoring-rules.json,project,Shipped organization rule example
+  README.md,project,Versioned contract semantics and Without git
+body: ""

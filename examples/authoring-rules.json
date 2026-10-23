@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "ORG.acceptance",
+      "field": "acceptance_criteria",
+      "predicate": { "op": "present" },
+      "severity": "error",
+      "explanation": "Active work needs an observable acceptance result.",
+      "remedy": "Describe a result that another agent can independently verify.",
+      "when": { "statuses": ["open", "in_progress", "blocked"] }
+    },
+    {
+      "id": "ORG.context",
+      "field": "description",
+      "predicate": { "op": "min_length", "value": 80 },
+      "severity": "warn",
+      "explanation": "Short context can omit the concrete problem and intended behavior.",
+      "remedy": "Explain the trigger, expected result and useful evidence."
+    },
+    {
+      "id": "ORG.title",
+      "field": "title",
+      "predicate": { "op": "not_contains", "value": "TODO" },
+      "severity": "info",
+      "explanation": "A placeholder title hides the intended result.",
+      "remedy": "Name the concrete user-visible result in the title."
+    }
+  ]
+}

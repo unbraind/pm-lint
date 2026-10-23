@@ -191,3 +191,86 @@ A tracker quality gate can start with errors and progressively adopt warnings:
 Run the host in a workspace where the package is activated. The package's own `release:check` covers identity/privacy, TypeScript, ESLint, jscpd, docstrings, all authored source coverage, production audit, package contents, changelog, release attestation and packed npm/native-Bun consumers. New packages stay unreleased until maintainer approval; the release workflow is dispatch-only and additionally gated by `PM_LINT_RELEASE_ENABLED`.
 
 Dogfood receipts, heuristic tuning decisions, coverage and behavioural revert proofs are recorded in the package tracker. The aggregate before/after corpus comparison and hand-checked PML003 sample are in [the dogfood report](docs/dogfood-round.md). Public evidence contains only aggregate counts and generic verdicts; raw titles, criteria and tracker configuration stay out of the repository.
+
+## Portable organization authoring rules
+
+`pm lint pack --pack authoring-rules.json` checks semantic authoring conventions
+through the same certified complete reader as the built-in rules. It reads every
+status, then applies the pack's explicit selectors. It does not change items or
+settings. pm-presets can distribute configuration and templates; core owns field
+types; this contract adds organization-specific assertions over canonical text.
+See the shipped [example pack](examples/authoring-rules.json).
+Measured public-data and adapter evidence is in the
+[validation report](docs/portable-rule-packs-validation.md).
+
+```sh
+pm lint pack --pack examples/authoring-rules.json
+pm lint pack --pack examples/authoring-rules.json --json
+```
+
+The strict version 1 contract is `{ "version": 1, "rules": [...] }`. Each rule
+requires `id`, `field`, `predicate`, `severity`, `explanation`, and `remedy`.
+Rule ids are unique, case-sensitive ASCII identifiers beginning with a letter;
+subsequent characters may be letters, digits, `_`, `.` or `-`. Unknown keys fail
+at every level, including predicates and selectors; unknown versions fail closed.
+
+| Property | Version 1 semantics |
+| --- | --- |
+| `field` | `title`, `description`, `acceptance_criteria`, `definition_of_ready`, `resolution`, `blocked_reason`, `outcome`, `value`, `why_now` |
+| `predicate` | `{ "op": "present" }`, or `{ "op": "contains" / "not_contains" / "starts_with", "value": "literal" }`, or `{ "op": "min_length" / "max_length", "value": integer }` |
+| `severity` | `info`, `warn`, `error`; only failed `error` assertions fail the gate |
+| `explanation`, `remedy` | Required nonblank organization-authored diagnostic text, at most 256 characters each |
+| `when` | Optional object with `statuses` and/or `types` exact string arrays; OR within each array, AND between them; no selector means all items |
+
+Matching is case-sensitive and literal, including characters such as `*` and `+`.
+Missing text fields behave as empty strings. `present` tests trimmed nonemptiness;
+other predicates use the original text. Length counts UTF-16 code units.
+Regex, glob and executable expression modes refuse with `unsafe_pattern` and a
+literal-predicate remedy. There are no imports, nested expressions or commands.
+
+Hard ceilings are 64 KiB of UTF-8 JSON, 64 rules, 64 characters per id/selector,
+32 values per selector list, 512 characters per literal, 65,536 characters per
+checked item field or length threshold, 100,000 potential item/rule pairs before
+selection, and 1,000 findings. Empty rule/selector arrays refuse. Exceeding a
+ceiling returns `limit_exceeded`; no partial result can pass. For SDK input the
+byte ceiling applies to the detached canonical pack; for files it also applies
+to the raw bytes, including whitespace. Regular files only are accepted.
+
+Rows contain `item_id`, `rule`, `field`, `severity`, `explanation` and `remedy`.
+They sort by exact item id then rule id, independent of locale, declaration order
+and storage order. Receipts include corpus/check/finding counts, severity counts
+and core's complete-list certificate. Item titles and text are not copied into
+rows. Host output budgets and continuation controls apply to `findings` in TOON
+and JSON. Exit codes are 0 for no error findings, 1 for error findings, and 2 for
+typed pack refusals (`invalid_pack`, `unsafe_pattern`, `limit_exceeded`, `pack_io`).
+Core read/certification failures retain core's diagnostic instead of becoming a
+successful or partial pack result. Baseline acknowledgments do not suppress pack
+rules; they belong to the separate built-in lint command.
+
+```ts
+import { PmClient } from '@unbrained/pm-cli/sdk';
+import { lintRulePack, readRulePack, RulePackRefusal } from 'pm-lint';
+import type { RulePack } from 'pm-lint';
+
+const pack: RulePack = await readRulePack('authoring-rules.json');
+try {
+  const result = await lintRulePack(new PmClient({ pmRoot: '.agents/pm' }), pack);
+  console.log(result.summary, result.exit_code);
+} catch (error) {
+  if (error instanceof RulePackRefusal) console.error(error.code, error.remedy);
+  else throw error;
+}
+```
+
+`parseRulePack(unknown)` validates SDK-supplied data. `lintRulePack` accepts the
+`listAllComplete` portion of the typed `PmClient` contract so adapters can supply
+the same certified canonical metadata without filesystem access in the evaluator.
+Tests compare real TOON and legacy JSON Markdown reader results; the pinned host
+migrates legacy Markdown during reading. These tests do not attest hosted database
+or network deployment. Pack semantics never inspect storage paths or invoke git.
+
+## Without git
+
+All lint commands, baselines, witness validation and portable packs work in a
+plain tracker directory. No lint command requires a git repository. Package
+release changelog generation uses git tags separately from tracker linting.
