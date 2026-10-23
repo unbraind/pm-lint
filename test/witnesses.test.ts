@@ -2,8 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
 import { commitImportedItem, readSettings } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -11,7 +9,7 @@ import extension, { lintWitnesses, parseWitnessContract, observationDigest, sour
 import type { CriterionBinding, CriterionWitness, WitnessContract, WitnessResult } from '../index.ts';
 import { readWitnessContract } from '../src/witnesses.ts';
 import { runWitnessCommand } from '../src/witness-command.ts';
-import { tracker } from './helpers.ts';
+import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
 
 /** Check the stable machine category and actionable remedy. */
 function refusal(code: string): (error: unknown) => boolean {
@@ -207,15 +205,9 @@ test('built CLI emits exact JSON and TOON citations in a non-git directory with 
   const item = (await client.create({ type: 'Task', title: 'Cite exact observation path', acceptanceCriteria: 'Proof' })).item;
   await writeFile(join(root, 'proof.txt'), 'verified\n');
   await writeFile(join(root, 'contract.json'), JSON.stringify(contract(item.id, 'Proof', [observation])));
-  const extensionRoot = join(pmRoot, 'extensions', 'pm-lint');
-  await mkdir(extensionRoot, { recursive: true });
-  const manifest = JSON.parse(await readFile(resolve('manifest.json'), 'utf8')) as Record<string, unknown>;
-  await writeFile(join(extensionRoot, 'manifest.json'), JSON.stringify({ ...manifest, entry: './index.mjs' }));
-  await writeFile(join(extensionRoot, 'index.mjs'), `export { default } from ${JSON.stringify(pathToFileURL(resolve('dist/index.js')).href)};`);
-  const env = { ...process.env, PM_PATH: pmRoot, PM_SOURCE_PM_PATH: pmRoot, PM_SOURCE_WORKSPACE_ROOT: root, PM_GLOBAL_PATH: join(root, 'profile'), GIT_CEILING_DIRECTORIES: dirname(root), PATH: join(root, 'no-executables'), HOME: root };
-  const cli = resolve('node_modules/@unbrained/pm-cli/dist/cli.js');
+  await installBuiltExtension(pmRoot);
   for (const format of [[], ['--json']]) {
-    const result = spawnSync(process.execPath, [cli, 'lint', 'witnesses', '--contract', 'contract.json', ...format], { cwd: root, env, encoding: 'utf8' });
+    const result = runGitFreeCli(root, pmRoot, ['lint', 'witnesses', '--contract', 'contract.json', ...format]);
     assert.equal(result.status, 0, result.stderr + result.stdout);
     assert.match(result.stdout, /proof\.txt:2:4/);
     if (format.length > 0) {
@@ -224,7 +216,7 @@ test('built CLI emits exact JSON and TOON citations in a non-git directory with 
       assert.equal(receipt.summary.supported, 1);
     } else assert.match(result.stdout, /findings/);
   }
-  const refused = spawnSync(process.execPath, [cli, 'lint', 'witnesses', '--json'], { cwd: root, env, encoding: 'utf8' });
+  const refused = runGitFreeCli(root, pmRoot, ['lint', 'witnesses', '--json']);
   assert.equal(refused.status, 2, refused.stderr + refused.stdout);
   assert.equal((JSON.parse(refused.stdout || refused.stderr) as { refusal: { code: string } }).refusal.code, 'invalid_contract', refused.stderr + refused.stdout);
 });

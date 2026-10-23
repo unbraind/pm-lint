@@ -4,6 +4,7 @@
 
 ### Added
 
+- Enforce portable organization authoring rule packs ([pm-lint-portable-rule-packs](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-portable-rule-packs.toon))
 - Acknowledge lint debt with source-bound evidence ([pm-lint-lint-baselines](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-lint-baselines.toon))
 - Validate declared acceptance criterion witnesses without executing code ([pm-lint-criterion-witnesses](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-criterion-witnesses.toon))
 - Certify complete tracker lint reads ([pm-lint-engine](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-engine.toon))

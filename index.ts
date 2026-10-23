@@ -2,6 +2,12 @@ import { defineExtension } from '@unbrained/pm-cli/sdk/authoring';
 import type { ExtensionApi } from '@unbrained/pm-cli/sdk/authoring';
 import { registerLintCommand } from './src/commands.ts';
 import { registerWitnessCommand } from './src/witness-command.ts';
+import { registerRulePackCommand } from './src/rule-pack-command.ts';
+
+/** Expose portable organization rules, bounded parsing and typed recovery guidance. */
+export { lintRulePack, parseRulePack, readRulePack, RulePackRefusal, RULE_PACK_FIELDS, RULE_PACK_LIMITS } from './src/rule-pack.ts';
+/** Expose the versioned semantic contract and compact diagnostic receipt. */
+export type { AuthoringPredicate, AuthoringRule, RulePack, RulePackFinding, RulePackResult, RulePackRefusalCode } from './src/rule-pack.ts';
 
 /** Expose portable acceptance witness validation and strict contract parsing. */
 export { lintWitnesses, parseWitnessContract, readWitnessContract, observationDigest, WitnessRefusal } from './src/witnesses.ts';
@@ -32,5 +38,5 @@ export type { RuleListing, RulesResult } from './src/commands.ts';
 export default defineExtension({
   name: 'pm-lint', version: '2026.10.13', description: 'Authoring-quality rules for useful pm context',
   /** Register one observational command; the package never mutates items. */
-  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); },
+  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); },
 });

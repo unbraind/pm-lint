@@ -126,7 +126,8 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   const manifest = JSON.parse(packOutput.slice(packOutput.lastIndexOf('\n[') + 1)) as { filename: string; files: { path: string }[] }[];
   const files = manifest[0].files.map(file => file.path);
   assert.ok(files.includes('dist/index.js'));
-  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md'].includes(file), `unexpected packed file: ${file}`);
+  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md'].includes(file), `unexpected packed file: ${file}`);
+  assert.ok(files.includes('examples/authoring-rules.json'));
   const tarball = join(scratch, manifest[0].filename);
   const sdk = JSON.parse(await importManifest(root)) as { devDependencies: Record<string, string> };
   for (const runtime of ['npm', 'bun']) {
@@ -210,6 +211,16 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.equal(toon.error, undefined);
     assert.ok(toon.stdout.length > 0, 'the default rendering is host TOON, not silence');
     assert.equal(toon.status, initial.verdict.exit_code ?? 0, 'TOON and JSON renderings share one exit contract');
+    // The same shipped declarative pack runs through npm/npx and native Bun/bunx.
+    const portablePath = join(cwd, 'node_modules/pm-lint/examples/authoring-rules.json');
+    const portable = jsonRead(cwd, runner, prefix, pmRoot, ['pack'], ['--pack', portablePath]);
+    assert.equal(portable.status, 1);
+    assert.ok(Number(portable.data.count) > 0);
+    assert.ok((portable.data.findings as { rule: string }[]).every(row => row.rule.startsWith('ORG.')));
+    const portableToon = runConsumer(cwd, runner, [...prefix, 'lint', 'pack', '--pack', portablePath], pmRoot);
+    assert.match(portableToon.stdout, /ORG.acceptance/);
+    await writeFile(join(cwd, 'pack-sdk.mjs'), `import { lintRulePack, readRulePack, RulePackRefusal } from 'pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nconst pack = await readRulePack('node_modules/pm-lint/examples/authoring-rules.json');\nconst result = await lintRulePack(new PmClient({ pmRoot: '.agents/pm', noExtensions: true }), pack);\nif (result.count < 1 || result.exit_code !== 1 || typeof RulePackRefusal !== 'function') throw new Error('Packed rule SDK contract failed');\nconsole.log('packed-rule-sdk-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['pack-sdk.mjs'], pmRoot), /packed-rule-sdk-ok/);
     // The packed witness SDK and command retain exact citations in both runtimes.
     const proof = (await fixtureClient.create({ type: 'Task', title: 'Preserve packed witness citations', acceptanceCriteria: 'Output preserves the exact citation path' })).item;
     const bytes = 'Verified synthetic citation observation\n';
