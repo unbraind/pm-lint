@@ -53,3 +53,34 @@ writable fixture. It does not establish hosted Postgres or network deployment.
 The git-free CLI tests set a git discovery ceiling and run with a PATH containing
 no git executable. Packed acceptance exercises the shipped example and public SDK
 through real npm/npx and native Bun/bunx consumers in CI.
+
+## Full release-gate receipt
+
+Implementation commit `3b6a590809aa72f82e1e83f742542731f732e09f` passed
+[CI run 40014216019](https://github.com/unbraind/pm-lint/actions/runs/40014216019).
+The subsequent evidence commit changes documentation and tracker receipts only.
+
+| Gate | Suite | Packed acceptance | Coverage |
+| --- | ---: | ---: | --- |
+| `npm run release:check`, Node 22 | 106/106 | 1/1 | 100/100/100/100 |
+| `npm run release:check`, Node 26 | 106/106 | 1/1 | 100/100/100/100 |
+| `bun run release:check`, Node 26 | 106/106 | 1/1 | 100/100/100/100 |
+
+Coverage reconciled all 21 configured authored sources, with unchanged 100%
+thresholds in each dimension. Each packed acceptance test ran npm/npx and native
+Bun/bunx SDK/CLI consumers. All three gates had zero failed, skipped or canceled
+top-level tests. Fresh-checkout tracker health, privacy/identity, duplication,
+typecheck, lint, docstrings, production dependency audit, package contents,
+changelog and release-attestation checks passed. CodeQL also passed.
+
+Behavioral revert proof removed only semantic evaluation, rebuilt, and made both
+selected semantic/CLI tests fail (0/2 pass). Independently bypassing strict parsing
+and rebuilding made both parser/resource tests fail (0/2 pass). Restoring the
+implementation returned the focused suite to 22/22; the final pack-only coverage
+run passed 8/8 and measured both new runtime modules at 100/100/100/100.
+
+The package worktree's separate local strict-health check reported ignored
+managed-extension host-version skew and pre-existing merge-fence drift. Neither
+was changed by this feature; both fresh CI jobs passed tracker health. No hosted
+backend acceptance or external review approval is claimed. Automated review
+services reported unavailable/skipped/neutral review states, not approvals.
