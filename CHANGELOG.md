@@ -21,6 +21,7 @@
 
 ### Other
 
+- Reconcile stale in-progress tracker records (2026-10-23) ([pm-lint-reconcile-1023](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-reconcile-1023.toon))
 - Cover package tooling: gates, workflows and packed consumers ([pm-lint-vh3f](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-vh3f.toon))
 - Register merge drivers during CI install ([pm-lint-41oh](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-41oh.toon))
 - Declare the schema capability so packed command flags activate ([pm-lint-1c6j](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-1c6j.toon))
