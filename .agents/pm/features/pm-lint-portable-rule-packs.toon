@@ -2,14 +2,19 @@ id: pm-lint-portable-rule-packs
 title: Enforce portable organization authoring rule packs
 description: Load bounded declarative semantic item checks through a typed version 1 contract with actionable diagnostics across tracker adapters.
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T19:37:23.673Z"
-updated_at: "2026-10-23T19:51:21.114Z"
+updated_at: "2026-10-24T21:46:43.348Z"
+closed_at: "2026-10-24T21:46:43.324Z"
+completed_at: "2026-10-24T21:46:43.324Z"
 author: codex-agent
 acceptance_criteria: Unsafe or unbounded patterns refuse with typed remedies; Unknown contract fields fail clearly; Identical rules yield identical diagnostics across storage adapters; SDK and CLI emit compact TOON or JSON without git; Read-only public tracker validation and CI npm plus Bun release gates provide measured evidence
 parent: pm-lint-epic
+resolution: "Portable packs refuse unsafe/unbounded patterns and unknown fields, produce equivalent adapter diagnostics and provide compact no-git SDK/CLI, public-copy evidence and npm/Bun CI."
+expected_result: Unsafe or unbounded patterns refuse with typed remedies; Unknown contract fields fail clearly; Identical rules yield identical diagnostics across storage adapters; SDK and CLI emit compact TOON or JSON without git; Read-only public tracker validation and CI npm plus Bun release gates provide measured evidence
+actual_result: "https://github.com/unbraind/pm-lint/pull/21, merged 2026-10-23T19:57:37Z, merge 6b36238c42d9f594b6cf0f5f4f593dcb398b18c8: Portable packs refuse unsafe/unbounded patterns and unknown fields, produce equivalent adapter diagnostics and provide compact no-git SDK/CLI, public-copy evidence and npm/Bun CI."
 comments[4]{created_at,author,text}:
   "2026-10-23T19:37:31.254Z",codex-agent,"Overlap rechecked against installed core SDK 2026.10.20, current published CLI 2026.10.23, pm-presets schema/settings/template export and upgrade, pm-review evidence workflows, and pm-lint rules/baselines/witnesses. Core owns field types and complete-list certification; presets distributes configuration; this feature adds read-only organization semantic checks without arbitrary execution. Plan: strict bounded version 1 JSON, literal predicates, typed remedies, adapter-independent certified reader, deterministic diagnostic ordering, CLI, docs and non-git public snapshot validation. No duplicate portable-pack item found."
   "2026-10-23T19:43:52.351Z",codex-agent,"Current CLI overlap verified from installed 2026.10.23 declarations: core workflow policies already enforce field presence, transitions, author/field-writer rules and approvals. This pack adds observational literal text/length authoring assertions with organization explanations and remedies, never installs or overrides governance. Reuses PmClient, complete-list certification, command registration and host TOON/JSON budgeting. Public pm-presets snapshot 470c2b2a367c36dbf19513b4db2f84fa979a057c: 76 items, 3 rules, 157 applicable checks, 25 warnings, 0 errors, 0 info, 6193 JSON bytes; results identical after rule reorder and all read-only snapshot filenames/bytes unchanged. Git discovery fenced outside any repository. Targeted new-source coverage currently 100/100/100/100; completing adapter parity and regression proof before CI."
@@ -30,4 +35,5 @@ docs[3]{path,scope,note}:
   docs/portable-rule-packs-validation.md,project,Public aggregate measurements and evidence boundaries
   examples/authoring-rules.json,project,Shipped organization rule example
   README.md,project,Versioned contract semantics and Without git
+close_reason: "https://github.com/unbraind/pm-lint/pull/21, merged 2026-10-23T19:57:37Z, merge 6b36238c42d9f594b6cf0f5f4f593dcb398b18c8: Portable packs refuse unsafe/unbounded patterns and unknown fields, produce equivalent adapter diagnostics and provide compact no-git SDK/CLI, public-copy evidence and npm/Bun CI."
 body: ""
