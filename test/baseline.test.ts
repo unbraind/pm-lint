@@ -7,13 +7,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { activateExtensionForTest, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
+import { isPmCliExpectedError } from '@unbrained/pm-cli/sdk';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
 import type { Finding } from '../src/types.ts';
 import extension, { acknowledgeFinding, BaselineRefusal, parseBaseline, sourceDigest } from '../index.ts';
 import type { Acknowledgment, LintBaseline } from '../index.ts';
 import { assertBaselinePolicy, isAcknowledged } from '../src/baseline.ts';
 import { acknowledgeBaselineFile, readBaseline } from '../src/baseline-file.ts';
-import { baselineRefusalReceipt, renderLintCommand, runAcknowledgeCommand, runLintCommand } from '../src/commands.ts';
+import { throwBaselineRefusal, renderLintCommand, runAcknowledgeCommand, runLintCommand } from '../src/commands.ts';
 import { lintItems } from '../src/engine.ts';
 import { resolveConfig } from '../src/settings.ts';
 import { tracker } from './helpers.ts';
@@ -218,7 +219,7 @@ test('host command returns typed refusals, observed evidence and compact debt co
   const ctx: CommandHandlerContext = { command: 'lint', args: [], options: {}, pm_root: pmRoot, repo_root: root, global: { author: 'lint-test' } };
   const initial = await runLintCommand(ctx);
   const row = initial.findings[0];
-  assert.equal((await runAcknowledgeCommand(ctx)).exit_code, 2);
+  await assert.rejects(runAcknowledgeCommand(ctx), error => isPmCliExpectedError(error) && error.exitCode === 2 && error.code === 'invalid_acknowledgment');
   ctx.options = { baseline: join(root, 'baseline.json'), id: row.item_id, rule: row.rule, reason: evidence.reason, ruleVersion: row.rule_version, sourceDigest: row.source_digest };
   assert.equal((await runAcknowledgeCommand(ctx)).ok, true);
   ctx.source_workspace_root = root;
@@ -232,14 +233,10 @@ test('host command returns typed refusals, observed evidence and compact debt co
   assert.equal(receipt.new_count, 0);
   assert.equal('exit_code' in receipt, false);
   ctx.options = { ...ctx.options, disable: ['PML002'] };
-  const rejected = await renderLintCommand(ctx);
-  assert.equal(rejected.exit_code, 2);
-  assert.equal((rejected.refusal as { code: string }).code, 'unsafe_policy');
-  assert.throws(() => baselineRefusalReceipt(new Error('unrelated')), /unrelated/);
+  await assert.rejects(renderLintCommand(ctx), error => isPmCliExpectedError(error) && error.exitCode === 2 && error.code === 'unsafe_policy');
+  assert.throws(() => throwBaselineRefusal(new Error('unrelated')), /unrelated/);
   ctx.options = { failOn: ['warn', 'error'] };
-  const malformed = await runAcknowledgeCommand({ ...ctx, options: { baseline: ['a', 'b'] } });
-  assert.equal(malformed.exit_code, 2);
-  assert.equal((malformed.refusal as { code: string }).code, 'invalid_acknowledgment');
+  await assert.rejects(runAcknowledgeCommand({ ...ctx, options: { baseline: ['a', 'b'] } }), error => isPmCliExpectedError(error) && error.exitCode === 2 && error.code === 'invalid_acknowledgment');
 });
 
 test('new baseline SDK and command paths work in a non-git tracker with no git executable', async t => {

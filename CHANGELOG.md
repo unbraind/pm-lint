@@ -22,6 +22,7 @@
 
 ### Other
 
+- Use the pm SDK for baseline command refusals ([pm-lint-sdk-adoption-1025](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-sdk-adoption-1025.toon))
 - Reconcile stale in-progress tracker records (2026-10-23) ([pm-lint-reconcile-1023](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-reconcile-1023.toon))
 - Cover package tooling: gates, workflows and packed consumers ([pm-lint-vh3f](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-vh3f.toon))
 - Register merge drivers during CI install ([pm-lint-41oh](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-41oh.toon))
