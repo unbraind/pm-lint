@@ -41,4 +41,6 @@ Retained the new tests and restored the original receipt-producing behavior in t
 
 ## Gates
 
-The linked pm test runs typecheck, lint, build and both focused suites. Full release checks retain the package's 100% statements/branches/functions/lines thresholds and zero-duplication threshold. npm and Bun gates, installation acceptance and CI results are recorded on the pm item and PR.
+The linked pm test runs typecheck, lint, build and both focused suites: **13 pass, 0 fail**. The isolated-home local `npm run release:check` passes: **121 unit tests**, **1 packed npm/npx and native Bun/bunx installation acceptance test**, no failures or skips, **100% statements/branches/functions/lines** across all **24 required source files**, and **0% duplication** across **43 sources**. Typecheck, lint, docstrings (91 declarations), production audit (zero vulnerabilities), pack dry-run, changelog and publish-attestation checks also pass. Thresholds are unchanged.
+
+[PR #25](https://github.com/unbraind/pm-lint/pull/25) carries the current-head CI receipts for Node 22/npm and Node 26/npm plus Bun full release gates. The pm item records local results and links this review boundary. Automatic reviewers that skip or hit quota do not constitute review approval; the PR remains for review and orchestrator verification.
