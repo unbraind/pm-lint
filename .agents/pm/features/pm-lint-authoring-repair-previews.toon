@@ -3,14 +3,19 @@ title: Preview minimal authoring repairs without writing tracker state
 description: Assemble revision-bound mechanical repair patches and explicit substantive questions from lint context using core disposable mutation validation. No application or automatic acceptance authoring.
 type: Feature
 pm_format_version: 2
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-25T06:35:47.072Z"
-updated_at: "2026-10-25T07:26:43.597Z"
+updated_at: "2026-10-25T09:08:46.513Z"
+closed_at: "2026-10-25T09:08:46.499Z"
+completed_at: "2026-10-25T07:38:18.000Z"
 author: codex-agent
 acceptance_criteria: Whitespace and duplicate-tag fixes revalidate cleanly in preview; absent expected behavior remains a question; stale revisions refuse; preview makes zero writes; typed SDK and compact TOON/JSON CLI are documented and validated on public tracker copies outside git.
 parent: pm-lint-epic
+resolution: "Delivered by https://github.com/unbraind/pm-lint/pull/23 (merge 74eba4c06c26, head 0840ce217fe3)"
+expected_result: Whitespace and duplicate-tag fixes revalidate cleanly in preview; absent expected behavior remains a question; stale revisions refuse; preview makes zero writes; typed SDK and compact TOON/JSON CLI are documented and validated on public tracker copies outside git.
+actual_result: "Merged at 2026-10-25T07:38:18Z; no readable required checks, so every completed head check run had to succeed, be neutral or be skipped; successful checks: CodeQL, CodeRabbit, codeql, test (22), test (26)"
 comments[8]{created_at,author,text}:
   "2026-10-25T06:35:52.306Z",codex-agent,"Overlap check: inspected pm-lint diagnostics, baselines, rule packs and witnesses; core structured mutation planning and previewItemMutations; sibling pm-review lineage, pm-presets upgrade, pm-memory consolidation and pm-todos proposals. Existing facilities diagnose/acknowledge debt or validate/apply specific domains. This feature assembles bounded revision-bound mechanical repair context and explicit questions, delegates semantic validation to the pinned core SDK, and adds no application, sync, outbox, journal or automatic substantive authoring path. SDK pin remains 2026.10.20; registry observed 2026.10.25. Plan: read-only snapshots, revision-bound keys, SDK staged validation, strict CLI selections, non-git regression/property tests, byte-inventory real-data validation, targeted local checks and full npm/Bun CI gates."
   "2026-10-25T06:48:55.180Z",codex-agent,"Implementation: single-target typed SDK and lint repair command; SDK-normalized title/tag patches, explicit substantive questions, raw-byte/native-field revision and context-bound plan key. Cold SDK reads were observed writing metadata caches and legacy Markdown reads can migrate storage; all reads now run in owned scratch snapshots and source fingerprints enforce zero source writes. No apply/journal/sync/shared mutable state is introduced. Focused tests passed 5/5 before the seeded model suite; adding TOON/JSON Markdown replay coverage and public-data measurements next."
@@ -58,4 +63,5 @@ docs[3]{path,scope}:
   docs/repair-preview-example.md,project
   docs/repair-preview-validation.md,project
   README.md,project
+close_reason: "{\"pr\":23,\"url\":\"https://github.com/unbraind/pm-lint/pull/23\",\"merge_commit_sha\":\"74eba4c06c26c1cf22caf986d89f2b3e8b1a8e75\",\"head_sha\":\"0840ce217fe35bd3abd4ccae815f940df9f17bbc\",\"merged_at\":\"2026-10-25T07:38:18Z\",\"checks\":[\"CodeQL\",\"CodeRabbit\",\"codeql\",\"test (22)\",\"test (26)\"]}"
 body: ""
