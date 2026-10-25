@@ -2,7 +2,13 @@ import { defineExtension } from '@unbrained/pm-cli/sdk/authoring';
 import type { ExtensionApi } from '@unbrained/pm-cli/sdk/authoring';
 import { registerLintCommand } from './src/commands.ts';
 import { registerWitnessCommand } from './src/witness-command.ts';
+import { registerRepairCommand } from './src/repair-command.ts';
 import { registerRulePackCommand } from './src/rule-pack-command.ts';
+
+/** Expose bounded revision-bound authoring previews and typed refusals. */
+export { previewAuthoringRepairs, RepairRefusal } from './src/repairs.ts';
+/** Expose mechanical patches and explicit author-question contracts. */
+export type { RepairRequest, RepairPatch, RepairPreview, RepairQuestion, RepairRefusalCode, MechanicalFinding, RepairBoundary, RepairPreviewOptions } from './src/repairs.ts';
 
 /** Expose portable organization rules, bounded parsing and typed recovery guidance. */
 export { lintRulePack, parseRulePack, readRulePack, RulePackRefusal, RULE_PACK_FIELDS, RULE_PACK_LIMITS } from './src/rule-pack.ts';
@@ -38,5 +44,5 @@ export type { RuleListing, RulesResult } from './src/commands.ts';
 export default defineExtension({
   name: 'pm-lint', version: '2026.10.13', description: 'Authoring-quality rules for useful pm context',
   /** Register one observational command; the package never mutates items. */
-  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); },
+  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); registerRepairCommand(api); },
 });

@@ -17,7 +17,7 @@ npx --package @unbrained/pm-cli pm package install npm:pm-lint
 bunx --bun --package @unbrained/pm-cli pm package install npm:pm-lint
 ```
 
-`pm package install` registers and activates the extension in the tracker. Run `pm lint`, `npx pm lint`, or `bunx --bun pm lint` after installation. Minimum host SDK: `2026.10.13`; Node `>=22.18.0`.
+`pm package install` registers and activates the extension in the tracker. Run `pm lint`, `npx pm lint`, or `bunx --bun pm lint` after installation. Minimum host SDK: `2026.10.20`; Node `>=22.18.0`.
 
 ```sh
 npm ci
@@ -274,3 +274,41 @@ or network deployment. Pack semantics never inspect storage paths or invoke git.
 All lint commands, baselines, witness validation and portable packs work in a
 plain tracker directory. No lint command requires a git repository. Package
 release changelog generation uses git tags separately from tracker linting.
+
+## Minimal authoring repair previews
+
+`pm lint repair --id pm-example-abcd --json` returns one revision-bound patch
+and explicit questions. `--revision <sha256>` refuses saved context after a
+source edit. TOON is the default; JSON uses the same compact receipt. A successful
+preview exits 0 even when questions remain. Typed refusals exit 2 with a code and
+remedy; incomplete SDK reads remain errors.
+
+The only patches are title-edge whitespace and SDK tag normalization (including
+duplicates). Blank titles, missing or vague acceptance criteria, absent Issue
+expected behavior, and other lint findings stay questions. Markdown body,
+criteria, relationships, status, ownership and evidence are never authored.
+Patches are limited to 16 KiB and one target per invocation. `remaining_mechanical`
+is the projected mechanical count; `validation` carries core's disposable semantic
+validation and its unresolved commit constraints. This does not certify substantive
+answers or future application.
+
+`previewAuthoringRepairs(pmRoot, { id, revision? })` exposes the same typed SDK
+receipt and throws `RepairRefusal` with `code` and `remedy`. Revisions bind original
+item bytes and all SDK-read native fields; plan keys also bind the certified
+corpus and lint configuration. Every invocation reads fresh state. There is no
+apply, saved-plan import, sync, journal recovery or background worker. A consumer
+that applies a patch must revalidate the target revision under its SDK mutation
+preconditions immediately before writing.
+
+SDK reads can create caches and migrate legacy documents, so all reads and core
+mutation validation run in an owned temporary snapshot. Source fingerprints
+reject concurrent edits; preview leaves source files, caches, history and journals
+unchanged. Foreign runtime, lock, journal, checkpoint, search and executable extension state is excluded with
+reasons in `excluded_state`; no peer record is replayed or deleted. Scratch files
+are removed when the invocation finishes. Configuration and regular native
+tracker files are required; unsafe filesystem entries refuse with a remedy.
+
+Repair previews work in plain directory trackers without git. They require local
+tracker storage for byte-bound evidence; hosted database/network execution is not
+attested. See [the SDK example](docs/repair-preview-example.md) and
+[validation evidence](docs/repair-preview-validation.md).
