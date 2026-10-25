@@ -126,7 +126,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   const manifest = JSON.parse(packOutput.slice(packOutput.lastIndexOf('\n[') + 1)) as { filename: string; files: { path: string }[] }[];
   const files = manifest[0].files.map(file => file.path);
   assert.ok(files.includes('dist/index.js'));
-  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md'].includes(file), `unexpected packed file: ${file}`);
+  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md'].includes(file), `unexpected packed file: ${file}`);
   assert.ok(files.includes('examples/authoring-rules.json'));
   const tarball = join(scratch, manifest[0].filename);
   const sdk = JSON.parse(await importManifest(root)) as { devDependencies: Record<string, string> };
@@ -239,6 +239,15 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(witnessToon.stdout, /proof\.txt#L1/);
     await writeFile(join(cwd, 'witness-sdk.mjs'), `import { lintWitnesses, parseWitnessContract, observationDigest, WitnessRefusal } from 'pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nimport { readFile } from 'node:fs/promises';\nconst contract = parseWitnessContract(JSON.parse(await readFile('witnesses.json', 'utf8')));\nconst result = await lintWitnesses(new PmClient({cwd: '.', pmRoot: '.agents/pm', noExtensions: true}), contract, '.');\nif (result.summary.supported !== 1 || observationDigest('a').length !== 64 || typeof WitnessRefusal !== 'function') throw new Error('Packed witness SDK contract failed');\nconsole.log('packed-witness-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['witness-sdk.mjs'], pmRoot), /packed-witness-sdk-ok/);
+    // Packed repair API and both renderers keep the single-target zero-write contract.
+    const repair = jsonRead(cwd, runner, prefix, pmRoot, ['repair'], ['--id', created.id]);
+    assert.equal(repair.status, 0);
+    assert.equal(repair.data.writes, 0);
+    assert.deepEqual(repair.data.patch, {});
+    assert.equal(jsonRead(cwd, runner, prefix, pmRoot, ['repair'], ['--id', created.id, '--revision', String(repair.data.revision)]).status, 0);
+    assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
+    await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from 'pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });

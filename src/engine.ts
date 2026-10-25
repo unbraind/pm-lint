@@ -1,11 +1,11 @@
 import { certifyCompleteListResult } from '@unbrained/pm-cli/sdk';
-import type { ItemMetadata, PmClient, PmCompleteListCertificate } from '@unbrained/pm-cli/sdk';
+import type { ItemMetadata, PmClient, PmCompleteListCertificate, PmCompleteListResult } from '@unbrained/pm-cli/sdk';
 import { analyzeDuplicateItems } from '@unbrained/pm-cli/sdk/query';
 import type { DuplicateItemsAnalysis } from '@unbrained/pm-cli/sdk/query';
 import { RULES } from './rules.ts';
 import { readLintSettings, resolveConfig } from './settings.ts';
 import type { LintOptions } from './settings.ts';
-import type { Finding, RuleCode, RuleScope, Severity } from './types.ts';
+import type { Finding, LintConfig, RuleCode, RuleScope, Severity } from './types.ts';
 import { assertBaselinePolicy, isAcknowledged, parseBaseline, RULE_VERSION, sourceDigest } from './baseline.ts';
 
 /** Privacy-conscious lint result with corpus certification and deterministic exit status. */
@@ -87,7 +87,13 @@ export async function lintItems(client: PmClient, pmRoot: string, options: LintO
   const config = resolveConfig(await readLintSettings(pmRoot), options);
   const baseline = options.baseline === undefined ? undefined : parseBaseline(options.baseline);
   if (baseline !== undefined) assertBaselinePolicy(config, resolveConfig(undefined), options);
-  const corpus = certifyCompleteListResult(await client.listAllComplete());
+  return lintCorpus(await client.listAllComplete(), config, options, now);
+}
+
+/** Evaluate an SDK-certified snapshot with the same rule engine used by ordinary lint. */
+export function lintCorpus(source: PmCompleteListResult, config: LintConfig, options: LintOptions = {}, now: number = Date.now()): LintResult {
+  const baseline = options.baseline === undefined ? undefined : parseBaseline(options.baseline);
+  const corpus = certifyCompleteListResult(source);
   const selected = selectItems(corpus.items, options);
   let duplicateIds = new Set<string>();
   if (config.rules.PML010.enabled) {

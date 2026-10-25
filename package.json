@@ -20,7 +20,9 @@
     "manifest.json",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/repair-preview-example.md",
+    "docs/repair-preview-validation.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -48,7 +50,7 @@
     "identity:check": "node scripts/identity-gate.ts"
   },
   "peerDependencies": {
-    "@unbrained/pm-cli": ">=2026.10.13"
+    "@unbrained/pm-cli": ">=2026.10.20"
   },
   "devDependencies": {
     "@babel/eslint-parser": "8.0.7",
@@ -99,11 +101,14 @@
     },
     "docs": [
       "README.md",
-      "CHANGELOG.md"
+      "CHANGELOG.md",
+      "docs/repair-preview-example.md",
+      "docs/repair-preview-validation.md"
     ],
     "examples": [
       "README.md",
-      "examples/authoring-rules.json"
+      "examples/authoring-rules.json",
+      "docs/repair-preview-example.md"
     ]
   },
   "publishConfig": {
@@ -130,5 +135,8 @@
   "duplicationGate": {
     "threshold": 0,
     "minTokens": 50
+  },
+  "dependencies": {
+    "@toon-format/toon": "4.4.0"
   }
 }
