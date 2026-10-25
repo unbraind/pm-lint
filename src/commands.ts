@@ -1,5 +1,5 @@
 import type { PmClient } from '@unbrained/pm-cli/sdk';
-import { PmClient as PmClientCtor, defineCommand } from '@unbrained/pm-cli/sdk';
+import { PmClient as PmClientCtor, createPmCliExpectedError, defineCommand } from '@unbrained/pm-cli/sdk';
 import type { CommandHandlerContext, ExtensionApi, FlagDefinition } from '@unbrained/pm-cli/sdk/authoring';
 import { RULES } from './rules.ts';
 import type { Rule } from './rules.ts';
@@ -66,13 +66,13 @@ export async function renderLintCommand(ctx: CommandHandlerContext): Promise<Rec
     const result = await runLintCommand(ctx);
     const { exit_code, ...receipt } = result;
     return { ...receipt, ...(exit_code === 0 ? {} : { exit_code }) };
-  } catch (error) { return baselineRefusalReceipt(error); }
+  } catch (error) { throwBaselineRefusal(error); }
 }
 
-/** Preserve typed baseline refusals for both TOON and JSON host output. */
-export function baselineRefusalReceipt(error: unknown): Record<string, unknown> {
+/** Delegate expected refusals to the host with only domain diagnostics, never input or I/O context. */
+export function throwBaselineRefusal(error: unknown): never {
   if (!(error instanceof BaselineRefusal)) throw error;
-  return { ok: false, refusal: { code: error.code, message: error.message, remedy: error.remedy }, exit_code: 2 };
+  throw createPmCliExpectedError(error.message, { context: { code: error.code, nextSteps: [error.remedy] } });
 }
 
 /** Acknowledge one freshly observed finding without modifying any tracker item. */
@@ -87,7 +87,7 @@ export async function runAcknowledgeCommand(ctx: CommandHandlerContext): Promise
     const result = await lintItems(client, ctx.pm_root, { baseline: { version: 1, acknowledgments: [] } });
     const baseline = await acknowledgeBaselineFile(resolve(path), result.findings, request);
     return { ok: true, acknowledgment: request, acknowledgment_count: baseline.acknowledgments.length };
-  } catch (error) { return baselineRefusalReceipt(error); }
+  } catch (error) { throwBaselineRefusal(error); }
 }
 
 /** Describe the documented rule table without reading tracker state. */
