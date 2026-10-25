@@ -11,4 +11,3 @@ export async function inventory(root: string): Promise<string> {
   }
   return hash.digest('hex');
 }
-
