@@ -1,7 +1,7 @@
 import { decode } from '@toon-format/toon';
 import { createHash, randomUUID } from 'node:crypto';
-import { PmClient, certifyCompleteListResult, getSettingsPath, locateItem, readSettings, resolveItemTypeRegistry, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
-import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
+import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
 import { REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
 import { lintCorpus } from './engine.ts';
@@ -132,6 +132,11 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   const settings = await readFileIfExists(getSettingsPath(pmRoot));
   await options.onBoundary?.('settings_read');
   const config = resolveConfig(lintSettingsFromText(settings));
+  // Guard references before readSettings can bootstrap schema files outside the disposable root.
+  const schema = (JSON.parse(settings!) as { schema?: Partial<PmSettings['schema']> }).schema;
+  try { await loadGuardedRuntimeSchema(pmRoot, schema); } catch {
+    throw new RepairRefusal('unsafe_repair', 'Schema references must stay inside the repair snapshot.', 'Use regular tracker-relative schema files before requesting a preview.');
+  }
   const nativeSettings = await readSettings(pmRoot);
   const registry = resolveItemTypeRegistry(nativeSettings);
   // Preserve pre-migration bytes: the pinned SDK may canonicalize legacy Markdown while reading.

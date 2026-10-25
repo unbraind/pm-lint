@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmod, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { certifyCompleteListResult, getItemPath, serializeItemDocument } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
@@ -186,5 +186,22 @@ test('foreign runtime, journals, checkpoints, indexes and extensions are exclude
   for (const name of names) {
     assert.ok(result.excluded_state[name].length > 5);
     assert.equal(await readFile(join(pmRoot, name, 'foreign.json'), 'utf8'), 'foreign partial record');
+  }
+});
+
+
+test('schema preflight refuses external bootstrap paths before SDK reads even without mechanical debt', async t => {
+  const { client, pmRoot, root } = await tracker(t);
+  const item = (await client.create({ title: 'Preserve external schema boundary', type: 'Task' })).item;
+  const path = join(pmRoot, 'settings.json');
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const external = join(root, 'foreign-fields.json');
+  for (const fields of ['../foreign-fields.json', external]) {
+    settings.schema = { files: { fields } };
+    await writeFile(path, JSON.stringify(settings));
+    const before = await inventory(pmRoot);
+    await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('unsafe_repair'));
+    await assert.rejects(stat(external), { code: 'ENOENT' });
+    assert.equal(await inventory(pmRoot), before);
   }
 });
