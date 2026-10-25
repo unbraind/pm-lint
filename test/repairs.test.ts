@@ -205,3 +205,17 @@ test('schema preflight refuses external bootstrap paths before SDK reads even wi
     assert.equal(await inventory(pmRoot), before);
   }
 });
+
+test('core ownership refusal returns a typed remedy without bypassing a peer claim', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Respect the owning peer', type: 'Task', assignee: 'peer-agent' })).item;
+  await seed(pmRoot, item);
+  const path = join(pmRoot, 'settings.json');
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  settings.governance = { preset: 'custom', ownership_enforcement: 'strict' };
+  await writeFile(path, JSON.stringify(settings));
+  const before = await inventory(pmRoot);
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('unsafe_repair'));
+  assert.equal(await inventory(pmRoot), before);
+  assert.equal((await client.get(item.id, { full: true })).item.assignee, 'peer-agent');
+});
