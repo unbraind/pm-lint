@@ -305,7 +305,7 @@ mutation validation run in an owned temporary snapshot. Source fingerprints
 reject concurrent edits; preview leaves source files, caches, history and journals
 unchanged. Foreign runtime, lock, journal, checkpoint, search and executable extension state is excluded with
 reasons in `excluded_state`; no peer record is replayed or deleted. Scratch files
-are removed when the invocation finishes. Configuration and regular native
+are removed when the invocation finishes. Referenced schema must stay in retained tracker directories (for example `schema/`); references into excluded operational state refuse rather than falling back to defaults. Configuration and regular native
 tracker files are required; unsafe filesystem entries refuse with a remedy.
 
 Repair previews work in plain directory trackers without git. They require local

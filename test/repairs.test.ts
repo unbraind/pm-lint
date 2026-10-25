@@ -24,6 +24,13 @@ function refusal(code: string): (error: unknown) => boolean {
   return error => error instanceof RepairRefusal && error.code === code && error.remedy.length > 20;
 }
 
+/** Assert typed refusal and the full byte/name preservation invariant together. */
+async function unchangedRefusal(pmRoot: string, id: string): Promise<void> {
+  const before = await inventory(pmRoot);
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id }), refusal('unsafe_repair'));
+  assert.equal(await inventory(pmRoot), before);
+}
+
 test('mechanical preview validates through core, preserves substantive questions and writes zero bytes', async t => {
   const { client, pmRoot } = await tracker(t);
   const item = (await client.create({ type: 'Issue', title: 'Verify observable behavior', acceptanceCriteria: 'works', expectedResult: '' })).item;
@@ -214,8 +221,29 @@ test('core ownership refusal returns a typed remedy without bypassing a peer cla
   const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
   settings.governance = { preset: 'custom', ownership_enforcement: 'strict' };
   await writeFile(path, JSON.stringify(settings));
-  const before = await inventory(pmRoot);
-  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('unsafe_repair'));
-  assert.equal(await inventory(pmRoot), before);
+  await unchangedRefusal(pmRoot, item.id);
   assert.equal((await client.get(item.id, { full: true })).item.assignee, 'peer-agent');
+});
+
+
+test('referenced schema cannot be silently dropped with excluded foreign operational state', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Retain configured schema semantics', type: 'Task' })).item;
+  const path = join(pmRoot, 'settings.json');
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  delete settings.schema;
+  await writeFile(path, JSON.stringify(settings));
+  assert.equal((await previewAuthoringRepairs(pmRoot, { id: item.id })).writes, 0);
+  settings.schema = { files: { fields: 42 } };
+  await writeFile(path, JSON.stringify(settings));
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('unsafe_repair'));
+  for (const name of ['runtime', 'locks', 'extensions', 'transactions', 'checkpoints', 'search']) {
+    await mkdir(join(pmRoot, name), { recursive: true });
+    const file = join(pmRoot, name, 'fields.json');
+    await writeFile(file, '{"fields":[]}');
+    settings.schema = { files: { fields: `schema/../${name}/fields.json` } };
+    await writeFile(path, JSON.stringify(settings));
+    await unchangedRefusal(pmRoot, item.id);
+    assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
+  }
 });

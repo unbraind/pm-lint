@@ -1,5 +1,6 @@
 import { decode } from '@toon-format/toon';
 import { createHash, randomUUID } from 'node:crypto';
+import { relative, resolve, sep } from 'node:path';
 import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
 import { REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
@@ -134,6 +135,10 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   const config = resolveConfig(lintSettingsFromText(settings));
   // Guard references before readSettings can bootstrap schema files outside the disposable root.
   const schema = (JSON.parse(settings!) as { schema?: Partial<PmSettings['schema']> }).schema;
+  const schemaFiles = Object.values(schema?.files ?? {});
+  if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(pmRoot, resolve(pmRoot, file)).split(sep)[0]))) {
+    throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
+  }
   try { await loadGuardedRuntimeSchema(pmRoot, schema); } catch {
     throw new RepairRefusal('unsafe_repair', 'Schema references must stay inside the repair snapshot.', 'Use regular tracker-relative schema files before requesting a preview.');
   }
