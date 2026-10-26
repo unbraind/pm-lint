@@ -2,30 +2,67 @@
 
 Project management = context management. Vague work items waste agent time because they cannot explain what to do, how to verify it, or what already happened. `pm-lint` judges authoring quality. Use it alongside `pm validate` for structure and references, `pm health` for workspace health, and `pm duplicates` for duplicate discovery.
 
-This package is unreleased and under local review. The following registry commands become available after maintainer-approved publication. For local review, build and install a packed artifact into a scratch tracker.
+The npm package is `@unbrained/pm-lint`. The pm extension identity, catalog display name and command names remain `pm-lint`: existing `pm lint` commands do not change. The public package homepage remains <https://pm-cli.unbrained.dev/packages/pm-lint>.
+
+This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.20`; Node `>=22.18.0`.
+
+With a pm host already installed, activate the registry package in your tracker:
 
 ```sh
-pm package install npm:pm-lint
-
-npm install --save-dev pm-lint @unbrained/pm-cli
-npx pm package install ./node_modules/pm-lint
-
-bun add --dev pm-lint @unbrained/pm-cli
-bunx --bun pm package install ./node_modules/pm-lint
-
-npx --package @unbrained/pm-cli pm package install npm:pm-lint
-bunx --bun --package @unbrained/pm-cli pm package install npm:pm-lint
+pm install npm:@unbrained/pm-lint
+# Equivalent current spelling:
+pm package install npm:@unbrained/pm-lint
+pm lint
 ```
 
-`pm package install` registers and activates the extension in the tracker. Run `pm lint`, `npx pm lint`, or `bunx --bun pm lint` after installation. Minimum host SDK: `2026.10.20`; Node `>=22.18.0`.
+The pinned pm host requires the `npm:` source prefix for registry packages, including scoped names. A bare `pm install @unbrained/pm-lint` is interpreted as a local source. Installation activates the manifest named `pm-lint` in the tracker; npm and Bun installation alone do not activate it.
+
+For a local SDK dependency and tracker activation:
+
+```sh
+npm install --save-dev @unbrained/pm-lint @unbrained/pm-cli
+npx pm package install ./node_modules/@unbrained/pm-lint
+npx pm lint
+
+bun add --dev @unbrained/pm-lint @unbrained/pm-cli
+bunx --bun pm package install ./node_modules/@unbrained/pm-lint
+bunx --bun pm lint
+```
+
+Global package-manager installation is also available:
+
+```sh
+npm i -g @unbrained/pm-lint
+bun add -g @unbrained/pm-lint
+```
+
+This extension exports an SDK and has no standalone executable. `npx @unbrained/pm-lint` and `bunx @unbrained/pm-lint` cannot run it directly; invoke the pm host instead:
+
+```sh
+npx --package @unbrained/pm-cli pm package install npm:@unbrained/pm-lint
+bunx --bun --package @unbrained/pm-cli pm package install npm:@unbrained/pm-lint
+```
+
+For review before publication, build a tarball in the package checkout:
 
 ```sh
 npm ci
 npm run build
 npm pack
-pm package install ./pm-lint-2026.10.13.tgz
-pm lint
-pm lint --json
+```
+
+In a fresh directory outside any Git repository, install the host and initialize a tracker, then install the packed artifact (copy it into that directory first):
+
+```sh
+npm install @unbrained/pm-cli@2026.10.20
+npx pm init lint-consumer --defaults --agent-guidance skip
+npx pm install ./unbrained-pm-lint-2026.10.13.tgz
+npx pm lint --json
+```
+
+The same packed artifact works with `bun add` and `bunx --bun pm`. Other lint commands include:
+
+```sh
 pm lint rules --json
 pm lint --output-include item_id,rule,title,excerpt --output-budget 2000
 pm lint --rule PML002 --rule PML004 --fail-on warn
@@ -249,8 +286,8 @@ rules; they belong to the separate built-in lint command.
 
 ```ts
 import { PmClient } from '@unbrained/pm-cli/sdk';
-import { lintRulePack, readRulePack, RulePackRefusal } from 'pm-lint';
-import type { RulePack } from 'pm-lint';
+import { lintRulePack, readRulePack, RulePackRefusal } from '@unbrained/pm-lint';
+import type { RulePack } from '@unbrained/pm-lint';
 
 const pack: RulePack = await readRulePack('authoring-rules.json');
 try {

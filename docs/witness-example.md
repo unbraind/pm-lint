@@ -33,8 +33,8 @@ checker does not run it. Do not execute SDK commands merely to lint a contract.
 
 ```typescript
 import { PmClient, certifyCompleteListResult, splitAcceptanceCriteria } from '@unbrained/pm-cli/sdk';
-import { lintWitnesses, sourceDigest } from 'pm-lint';
-import type { WitnessContract } from 'pm-lint';
+import { lintWitnesses, sourceDigest } from '@unbrained/pm-lint';
+import type { WitnessContract } from '@unbrained/pm-lint';
 
 const client = new PmClient({ cwd: '.', pmRoot: '.agents/pm', noExtensions: true });
 const corpus = certifyCompleteListResult(await client.listAllComplete());
@@ -64,8 +64,8 @@ excerpt or the citation line alone:
 
 ```typescript
 import { readFile } from 'node:fs/promises';
-import { observationDigest } from 'pm-lint';
-import type { CriterionWitness } from 'pm-lint';
+import { observationDigest } from '@unbrained/pm-lint';
+import type { CriterionWitness } from '@unbrained/pm-lint';
 
 const bytes = await readFile('docs/citation-observation.txt');
 const observation: CriterionWitness = {

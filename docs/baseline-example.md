@@ -2,8 +2,8 @@
 
 ```ts
 import { PmClient } from '@unbrained/pm-cli/sdk';
-import { acknowledgeFinding, lintItems, parseBaseline } from 'pm-lint';
-import type { Acknowledgment } from 'pm-lint';
+import { acknowledgeFinding, lintItems, parseBaseline } from '@unbrained/pm-lint';
+import type { Acknowledgment } from '@unbrained/pm-lint';
 
 const pmRoot = '.agents/pm';
 const client = new PmClient({ pmRoot, noExtensions: true });
