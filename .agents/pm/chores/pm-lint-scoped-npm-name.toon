@@ -1,0 +1,33 @@
+id: pm-lint-scoped-npm-name
+title: Publish pm-lint as @unbrained/pm-lint
+description: "npm rejected the unscoped name as too similar to publint. Publish metadata, install instructions and packed consumer checks must use @unbrained/pm-lint while extension identity and commands stay pm-lint."
+type: Chore
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-26T10:48:51.376Z"
+updated_at: "2026-10-26T11:03:16.051Z"
+author: codex-agent
+acceptance_criteria: Scoped package metadata and public homepage agree; npm and Bun packed installs activate pm-lint in non-git trackers and run real lint commands; both release gates pass and a ready PR records evidence.
+comments[6]{created_at,author,text}:
+  "2026-10-26T10:48:54.786Z",codex-agent,"Plan: rename only the npm coordinate and SDK imports, preserve manifest name pm-lint, command names and catalog display_name. Keep publishConfig.access public and use the catalog homepage. Branch starts from main independently of open PR #26; overlap is package metadata, README and release workflow. Verify scoped source resolution and tarball activation in fresh non-git trackers, npm and Bun installs, targeted regressions and both full release gates. Do not publish or merge."
+  "2026-10-26T10:50:39.128Z",codex-agent,"Pinned host inspection: registry packages require an explicit npm: prefix, so document pm install npm:@unbrained/pm-lint; bare pm install @unbrained/pm-lint resolves as a local source. This extension has no bin; npx/bunx must invoke the pm host. Updated all current SDK imports and scoped node_modules paths. Regression proof: independently restoring origin/main package.json or the release workflow makes the corresponding package-metadata test fail (1 failure each); restored files pass 2/2. Typecheck and lint pass."
+  "2026-10-26T10:51:43.905Z",codex-agent,"Packed proof: npm pack --ignore-scripts --json produced unbrained-pm-lint-2026.10.13.tgz with 69 allowlisted files. npm install --prefix <scratch-npm> --ignore-scripts --no-audit --no-fund <tarball> @unbrained/pm-cli@2026.10.20 and bun add --cwd <scratch-bun> --ignore-scripts <tarball> @unbrained/pm-cli@2026.10.20 both exited 0; installed package.json name is @unbrained/pm-lint. Both prefixes are outside Git. npx --no-install pm init lint-consumer --defaults --agent-guidance skip --json, pm install <tarball> --json, and pm create Feature \"Weak context item\" --description \"Weak context item\" --json all exited 0, repeated through bunx --bun --no-install pm. Install reported extension.name pm-lint, activated true and verification.status ok with all six commands. Real pm lint --json exited 1 with scanned=1, count=3, PML002/PML006/PML008 in each runtime, the expected synthetic lint failure. Exact commands and outputs: docs/scoped-npm-validation.md."
+  "2026-10-26T10:56:36.501Z",codex-agent,"Additional source-resolution proof: npx --no-install pm install @unbrained/pm-lint --dry-run --json in the npm consumer exits 3 with local_source_not_found_bare_name and recommends pm package install npm:@unbrained/pm-lint. README documents that required prefix. Native bun pm pack --ignore-scripts --destination <scratch> --quiet exits 0, creates unbrained-pm-lint-2026.10.13.tgz with 69 files, npm name @unbrained/pm-lint and manifest name pm-lint. Full npm/npx and native Bun/bunx packed acceptance passes 1/1. Isolated strict pm health passes; the normal home has an unrelated globally installed extension version skew. No telemetry settings changed."
+  "2026-10-26T10:59:47.179Z",codex-agent,"npm run release:check PASS with isolated HOME and Git config: 123/123 suite tests plus 1/1 packed npm/npx and native Bun/bunx acceptance, zero failures/skips. All 24 intended source files report 100% statements, branches, functions and lines at unchanged thresholds; duplication is 0%; all 91 declarations documented; production audit has zero vulnerabilities. Identity, typecheck, lint, pack dry-run, changelog check and release publish-attestation check pass. Changed-file privacy scan passes 13/13 files with zero matches. Bun release gate is running."
+  "2026-10-26T11:03:14.347Z",codex-agent,"bun run release:check PASS with isolated HOME and Git config: 123/123 suite tests and 1/1 packed acceptance; zero failures or skips. Coverage reconciles 24 source files at 100% statements/branches/functions/lines, unchanged thresholds. npm and Bun complete release gates both exit 0. Commands and install outputs are in docs/scoped-npm-validation.md. Open PR #26 is independent; overlap includes metadata, README and release workflow. Its derived homepage assertion must become the explicit unscoped catalog URL when combined. All requested changes are ready for a review PR; no merge or npm publication. Release this claim and leave the item in progress for orchestrator verification."
+files[5]{path,scope,note}:
+  .github/workflows/release.yml,project,Scoped registry Bun verification
+  package-lock.json,project,Regenerated npm lockfile
+  package.json,project,Scoped npm name and public catalog metadata
+  test/install.acceptance.ts,project,Scoped npm and Bun packed consumer proofs
+  test/package-metadata.test.ts,project,Package identity and homepage regressions
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/package-metadata.test.ts,project,codex-agent,"2026-10-26T10:50:48.696Z",local_mutation,chore/scoped-npm-name
+docs[5]{path,scope,note}:
+  docs/baseline-example.md,project,Scoped SDK imports
+  docs/repair-preview-example.md,project,Scoped SDK imports
+  docs/scoped-npm-validation.md,project,Exact packed install commands and observed outputs
+  docs/witness-example.md,project,Scoped SDK imports
+  README.md,project,Scoped installation and unchanged extension identity
+body: ""

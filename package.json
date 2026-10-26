@@ -1,5 +1,5 @@
 {
-  "name": "pm-lint",
+  "name": "@unbrained/pm-lint",
   "version": "2026.10.13",
   "description": "Authoring-quality lint rules for useful pm item context",
   "repository": {
@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/unbraind/pm-lint/issues"
   },
-  "homepage": "https://github.com/unbraind/pm-lint#readme",
+  "homepage": "https://pm-cli.unbrained.dev/packages/pm-lint",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -94,7 +94,7 @@
       ],
       "links": {
         "docs": "https://github.com/unbraind/pm-lint#readme",
-        "npm": "https://www.npmjs.com/package/pm-lint",
+        "npm": "https://www.npmjs.com/package/@unbrained/pm-lint",
         "repository": "https://github.com/unbraind/pm-lint",
         "report": "https://github.com/unbraind/pm-lint/issues"
       }

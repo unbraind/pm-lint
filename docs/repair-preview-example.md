@@ -1,7 +1,7 @@
 # Revision-bound repair context
 
 ```ts
-import { previewAuthoringRepairs, RepairRefusal } from 'pm-lint';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
 
 try {
   const first = await previewAuthoringRepairs('.agents/pm', { id: 'pm-example-abcd' });
