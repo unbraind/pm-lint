@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, writeFile, readdir } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -128,7 +128,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   assert.match(manifest[0].filename, /^unbrained-pm-lint-[0-9].*\.tgz$/);
   const files = manifest[0].files.map(file => file.path);
   assert.ok(files.includes('dist/index.js'));
-  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md'].includes(file), `unexpected packed file: ${file}`);
+  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md', 'docs/incremental-example.md', 'docs/incremental-validation.md'].includes(file), `unexpected packed file: ${file}`);
   assert.ok(files.includes('examples/authoring-rules.json'));
   const tarball = join(scratch, manifest[0].filename);
   const sdk = JSON.parse(await importManifest(root)) as { devDependencies: Record<string, string> };
@@ -255,6 +255,30 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
     await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
+    // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
+    const state = join(cwd, 'lint.local.json');
+    const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);
+    assert.equal(incremental.data.ok, true);
+    assert.equal((await stat(state)).mode & 0o777, 0o600);
+    await chmod(state, 0o600);
+    assert.deepEqual(incremental.data.findings, lintRaw(cwd, runner, prefix, pmRoot, []).findings);
+    const repeat = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state]);
+    assert.equal((repeat.data.incremental as { changed_items: number }).changed_items, 0);
+    assert.equal((await stat(state)).mode & 0o777, 0o600);
+    await writeFile(join(cwd, 'incremental-sdk.mjs'), `import { filesystemLintSource, lintIncremental, lintIncrementalFile, parseIncrementalCheckpoint, IncrementalRefusal } from '@unbrained/pm-lint';\nimport { chmod, readFile, stat, writeFile } from 'node:fs/promises';\nconst source = filesystemLintSource('.agents/pm');\nconst first = await lintIncremental(source, {rebuild: true});\nconst next = await lintIncremental(source, {checkpoint: parseIncrementalCheckpoint(JSON.parse(JSON.stringify(first.checkpoint)))});\nif (next.incremental.changed_items !== 0 || next.incremental.reused === 0) throw new Error('Packed incremental SDK contract failed');\nconst state = 'sdk-checkpoint.local.json';\nawait lintIncrementalFile(source, state, true);\nawait chmod(state, 0o600);\nawait lintIncrementalFile(source, state);\nif (((await stat(state)).mode & 0o777) !== 0o600) throw new Error('Packed permission drift');\nconst policy = source.policy; let calls = 0;\nsource.policy = async () => { const result = await policy(); if (++calls === 3) await writeFile(state, 'foreign state'); return result; };\nlet refused = false;\ntry { await lintIncrementalFile(source, state); } catch (error) { if (!(error instanceof IncrementalRefusal) || error.code !== 'source_changed') throw error; refused = true; }\nif (!refused || await readFile(state, 'utf8') !== 'foreign state') throw new Error('Packed foreign overwrite');\nconsole.log('packed-incremental-sdk-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['incremental-sdk.mjs'], pmRoot), /packed-incremental-sdk-ok/);
+    // Project-local binaries are exercised directly in addition to npx/bunx.
+    const localRead = jsonRead(cwd, runtime === 'npm' ? process.execPath : 'bun', [join(cwd, 'node_modules', '.bin', 'pm')], pmRoot, ['incremental'], ['--state', state]);
+    assert.equal(localRead.data.ok, true);
+    assert.equal((await stat(state)).mode & 0o777, 0o600);
+    const globalRoot = join(scratch, `${runtime}-global`);
+    const globalEnv = { ...consumerEnv(cwd, pmRoot), BUN_INSTALL_GLOBAL_DIR: join(globalRoot, 'packages'), BUN_INSTALL_BIN: join(globalRoot, 'bin') };
+    const globalArgs = runtime === 'npm' ? ['install', '--global', '--prefix', globalRoot, '--ignore-scripts', '--no-audit', '--no-fund', `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`] : ['add', '--global', '--ignore-scripts', `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`];
+    const globalInstall = spawnSync(runtime, globalArgs, { cwd, env: globalEnv, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(globalInstall.status, 0, globalInstall.stderr);
+    const globalRead = jsonRead(cwd, runtime === 'npm' ? process.execPath : 'bun', [join(globalRoot, 'bin', 'pm')], pmRoot, ['incremental'], ['--state', state]);
+    assert.equal(globalRead.data.ok, true);
+    assert.equal((await stat(state)).mode & 0o777, 0o600);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });

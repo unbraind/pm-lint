@@ -16,7 +16,7 @@ test('host activation exposes lint commands and preserves lint receipt exit stat
   const item = (await client.create({ title: 'TODO', type: 'Task' })).item;
   const activation = await activateExtensionForTest(extension, { name: 'pm-lint', capabilities: ['commands', 'schema'] });
   assert.deepEqual(activation.failed, []);
-  assert.equal(activation.commands.handlers.length, 6);
+  assert.equal(activation.commands.handlers.length, 7);
   const lint = assertRegisteredCommandContract(activation.registrations, { command: 'lint', flags: ['--rule', '--disable', '--id', '--severity', '--fail-on', '--type', '--status', '--since'] });
   for (const flag of lint.flags) {
     assert.ok((flag.description ?? '').length > 0, `${flag.long} carries a help description`);

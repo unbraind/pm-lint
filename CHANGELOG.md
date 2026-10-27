@@ -4,6 +4,7 @@
 
 ### Added
 
+- Preserve complete lint results with incremental rule invalidation ([pm-lint-incremental-invalidation](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-incremental-invalidation.toon))
 - Preview minimal authoring repairs without writing tracker state ([pm-lint-authoring-repair-previews](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-authoring-repair-previews.toon))
 - Enforce portable organization authoring rule packs ([pm-lint-portable-rule-packs](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-portable-rule-packs.toon))
 - Acknowledge lint debt with source-bound evidence ([pm-lint-lint-baselines](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-lint-baselines.toon))

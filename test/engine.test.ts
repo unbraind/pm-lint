@@ -3,7 +3,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 import { getSettingsPath } from '@unbrained/pm-cli/sdk';
-import { duplicateItemIds, EXCERPT_LIMIT, excerptText, inScope, lintItems, sinceTimestamp, statusSelection } from '../src/engine.ts';
+import { duplicateItemIds, EXCERPT_LIMIT, excerptText, inScope, lintCorpus, lintItems, sinceTimestamp, statusSelection } from '../src/engine.ts';
+import { resolveConfig } from '../src/settings.ts';
 import { tracker } from './helpers.ts';
 
 /** Certify terminal inclusion and rule threshold behavior with genuine SDK mutations. */
@@ -157,11 +158,19 @@ test('scope, status selection and excerpt helpers cover their whole vocabulary',
   assert.equal(inScope('open', 'blocked'), false);
   assert.equal(inScope('blocked', 'blocked'), true);
   assert.equal(inScope('blocked', 'open'), false);
+  assert.equal(inScope('open', 'legacy_unregistered_status'), false);
+  assert.equal(inScope('in_progress', 'legacy_unregistered_status'), false);
   assert.deepEqual(statusSelection('closed,canceled'), ['closed', 'canceled']);
   assert.deepEqual(statusSelection(' open '), ['open']);
   assert.throws(() => statusSelection(' , '));
   assert.equal(excerptText('  padded  '), 'padded');
   assert.equal(excerptText('x'.repeat(400)).length, EXCERPT_LIMIT);
+});
+
+test('snapshot callers retain default policy, clock and built-in registry arguments', async t => {
+  const { client, pmRoot } = await tracker(t);
+  await client.create({ title: 'Observe snapshot engine defaults', type: 'Task', acceptanceCriteria: 'The complete result matches ordinary lint', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true });
+  assert.deepEqual(lintCorpus(await client.listAllComplete(), resolveConfig(undefined)), await lintItems(client, pmRoot));
 });
 
 /** Every text-bearing rule carries the exact offending context through the complete reader. */

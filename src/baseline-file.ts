@@ -1,8 +1,9 @@
-import { open, readFile, rename, rm } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { acknowledgeFinding, BaselineRefusal, parseBaseline } from './baseline.ts';
 import type { Acknowledgment, LintBaseline } from './baseline.ts';
 import type { Finding } from './types.ts';
+import { prepareSidecarPublication, readSidecarSnapshot, removeOwnedStage, SidecarConflict } from './sidecar-publication.ts';
 
 /** Read an explicit baseline; only acknowledgment creation may start from a missing file. */
 export async function readBaseline(path: string, allowMissing = false): Promise<LintBaseline> {
@@ -13,6 +14,11 @@ export async function readBaseline(path: string, allowMissing = false): Promise<
     if (allowMissing && (error as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, acknowledgments: [] };
     throw new BaselineRefusal('baseline_io', 'Cannot read the baseline.', 'Check that the baseline file exists and is readable; use lint acknowledge to create it.');
   }
+  return baselineFromText(text);
+}
+
+/** Validate exactly the baseline bytes observed under the publication lock. */
+function baselineFromText(text: string): LintBaseline {
   let value: unknown;
   try { value = JSON.parse(text); } catch {
     throw new BaselineRefusal('invalid_baseline', 'Baseline is not valid JSON.', 'Restore a valid baseline document before retrying.');
@@ -32,6 +38,7 @@ export async function acknowledgeBaselineFile(path: string, findings: readonly F
     return await publishBaseline(lock, path, findings, request);
   } catch (error) {
     if (error instanceof BaselineRefusal) throw error;
+    if (error instanceof SidecarConflict) throw new BaselineRefusal('evidence_changed', error.message, 'Read the current baseline and retry; peer and foreign files were preserved.');
     throw new BaselineRefusal('baseline_io', 'Cannot publish the baseline.', 'Check baseline permissions and available storage, then retry.');
   }
 }
@@ -39,17 +46,17 @@ export async function acknowledgeBaselineFile(path: string, findings: readonly F
 /** Retain exclusive ownership until publication, cleaning up only this writer's unpublished lock. */
 async function publishBaseline(lock: FileHandle, path: string, findings: readonly Finding[], request: Acknowledgment): Promise<LintBaseline> {
   const lockPath = `${path}.lock`;
-  let published = false;
+  let owned;
+  try { owned = await lock.stat({ bigint: true }); } catch (error) { await lock.close(); throw error; }
+  let publication;
   try {
-    const baseline = acknowledgeFinding(findings, await readBaseline(path, true), request);
-    await lock.writeFile(`${JSON.stringify(baseline, null, 2)}\n`);
-    await lock.sync();
-    await lock.close();
-    await rename(lockPath, path);
-    published = true;
+    const observed = readSidecarSnapshot(path, Number.MAX_SAFE_INTEGER);
+    const baseline = acknowledgeFinding(findings, observed === undefined ? { version: 1, acknowledgments: [] } : baselineFromText(observed.bytes.toString('utf8')), request);
+    publication = await prepareSidecarPublication(path, `${JSON.stringify(baseline, null, 2)}\n`, observed, Number.MAX_SAFE_INTEGER, { path: lockPath, handle: lock });
+    publication.commit();
     return baseline;
   } finally {
-    await lock.close();
-    if (!published) await rm(lockPath, { force: true });
+    if (publication === undefined) { await lock.close(); removeOwnedStage(lockPath, owned); }
+    else publication.dispose();
   }
 }

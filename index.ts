@@ -4,6 +4,18 @@ import { registerLintCommand } from './src/commands.ts';
 import { registerWitnessCommand } from './src/witness-command.ts';
 import { registerRepairCommand } from './src/repair-command.ts';
 import { registerRulePackCommand } from './src/rule-pack-command.ts';
+import { registerIncrementalCommand } from './src/incremental-command.ts';
+
+/** Expose complete incremental scans using caller-injected native SDK capabilities. */
+export { lintIncremental, incrementalRuleVersion } from './src/incremental.ts';
+export type { IncrementalLintSource, IncrementalLintResult, IncrementalBoundary } from './src/incremental.ts';
+/** Expose strict portable checkpoint contracts and dependency declarations. */
+export { parseIncrementalCheckpoint, parseIncrementalRequest, IncrementalRefusal, INCREMENTAL_LIMITS, RULE_DEPENDENCIES } from './src/incremental-contract.ts';
+export type { IncrementalCheckpoint, IncrementalRequest, IncrementalCursor, IncrementalItemState, IncrementalRefusalCode, RuleDependency } from './src/incremental-contract.ts';
+/** Expose the optional local checkpoint adapter; hosted callers keep their own compare-and-set storage. */
+export { filesystemLintSource, lintIncrementalFile, readIncrementalCheckpoint } from './src/incremental-file.ts';
+export type { IncrementalFileBoundary } from './src/incremental-file.ts';
+export type { LintStatusRegistry } from './src/statuses.ts';
 
 /** Expose bounded revision-bound authoring previews and typed refusals. */
 export { previewAuthoringRepairs, RepairRefusal } from './src/repairs.ts';
@@ -44,5 +56,5 @@ export type { RuleListing, RulesResult } from './src/commands.ts';
 export default defineExtension({
   name: 'pm-lint', version: '2026.10.13', description: 'Authoring-quality rules for useful pm context',
   /** Register one observational command; the package never mutates items. */
-  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); registerRepairCommand(api); },
+  activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); registerRepairCommand(api); registerIncrementalCommand(api); },
 });

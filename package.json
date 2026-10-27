@@ -22,13 +22,15 @@
     "LICENSE",
     "CHANGELOG.md",
     "docs/repair-preview-example.md",
-    "docs/repair-preview-validation.md"
+    "docs/repair-preview-validation.md",
+    "docs/incremental-example.md",
+    "docs/incremental-validation.md"
   ],
   "scripts": {
     "build": "tsc",
     "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build && npm run build:test && node --test test/*.test.ts",
-    "test:install": "npm run build && node --test --test-reporter=spec test/install.acceptance.ts",
+    "test": "npm run build && npm run build:test && node --test --test-concurrency=2 test/*.test.ts",
+    "test:install": "npm run build && node --test --test-concurrency=2 --test-reporter=spec test/install.acceptance.ts",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "check": "npm run typecheck",
@@ -50,7 +52,7 @@
     "identity:check": "node scripts/identity-gate.ts"
   },
   "peerDependencies": {
-    "@unbrained/pm-cli": ">=2026.10.20"
+    "@unbrained/pm-cli": ">=2026.10.23"
   },
   "devDependencies": {
     "@babel/eslint-parser": "8.0.7",
@@ -107,12 +109,15 @@
       "README.md",
       "CHANGELOG.md",
       "docs/repair-preview-example.md",
-      "docs/repair-preview-validation.md"
+      "docs/repair-preview-validation.md",
+      "docs/incremental-example.md",
+      "docs/incremental-validation.md"
     ],
     "examples": [
       "README.md",
       "examples/authoring-rules.json",
-      "docs/repair-preview-example.md"
+      "docs/repair-preview-example.md",
+      "docs/incremental-example.md"
     ]
   },
   "publishConfig": {

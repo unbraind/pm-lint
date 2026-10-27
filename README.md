@@ -4,7 +4,7 @@ Project management = context management. Vague work items waste agent time becau
 
 The npm package is `@unbrained/pm-lint`. The pm extension identity, catalog display name and command names remain `pm-lint`: existing `pm lint` commands do not change. The public package homepage remains <https://pm-cli.unbrained.dev/packages/pm-lint>.
 
-This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.20`; Node `>=22.18.0`.
+This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.23`; Node `>=22.18.0`.
 
 With a pm host already installed, activate the registry package in your tracker:
 
@@ -54,7 +54,7 @@ npm pack
 In a fresh directory outside any Git repository, install the host and initialize a tracker, then install the packed artifact (copy it into that directory first):
 
 ```sh
-npm install @unbrained/pm-cli@2026.10.20
+npm install @unbrained/pm-cli@2026.10.23
 npx pm init lint-consumer --defaults --agent-guidance skip
 npx pm install ./unbrained-pm-lint-2026.10.13.tgz
 npx pm lint --json
@@ -78,6 +78,69 @@ The commands use the host renderer: TOON by default and global `--json` for auto
 `summary` counts findings for every rule and severity, including zeros. `scanned` is the selected item count; `corpus_count` and `complete_list` prove the entire tracker was read before selection. Lint never edits an item or records test results in the scanned tracker. Both `pm lint` and `pm lint rules` declare the SDK `read_output` contract, so host projection (`--output-include` / `--output-exclude`), row limits, output budgets and `--output-cursor` continuations apply. Bounded output can contain fewer rows than `count`; read the host truncation receipt and follow every cursor, or use `--output-budget unbounded --output-limit unbounded` for a full report. Exit status and summary describe the full evaluation even when rendered rows are bounded.
 
 `pm lint rules` lists each rule's code, default severity, default scope, field, description, hint and settings key.
+
+## Incremental complete lint
+
+```bash
+pm lint incremental --state lint.local.json --rebuild --json
+# After editing an item:
+pm lint incremental --state lint.local.json --json
+```
+
+The first scan requires `--rebuild`. Later scans retain the **complete** result,
+including findings on unchanged items. Each rule/item pair records its declared
+native-field dependencies and outcome. An unchanged local predicate and its
+bounded excerpt are reused; titles and full source digests come from the current
+SDK read. `incremental.by_rule` reports actual predicate calls and reused pairs.
+The receipt and findings support the host's TOON/JSON projection, output budgets
+and continuation controls. The checkpoint itself is never printed.
+
+| Rules | Declared inputs |
+| --- | --- |
+| PML001 | title |
+| PML002 | type, acceptance criteria |
+| PML003 | title, acceptance criteria |
+| PML004 | title, resolution, actual result, close reason/time, comments |
+| PML006 | type, files, tests |
+| PML008 | title, description, notes |
+| PML005, PML007, PML009, PML010 | Global: clock/activity, hierarchy, local blocker references, SDK duplicate clusters |
+
+Status affects every pair's applicability. Global predicates run on every scan
+within their configured scope; duplicate analysis remains owned by the SDK.
+Every scan still certifies the complete corpus, hashes native metadata and
+drains SDK event pages. This reduces rule evaluation work, while retaining full
+read and certification costs. It is separate from `pm lint --since`, which
+selects a partial set of items by time.
+
+Cursor loss, missing history anchors, unrecorded native imports, rule/dependency
+version changes and policy/status-role drift refuse explicitly. Review the
+typed `refusal.code` and `refusal.remedy`, then use `--rebuild`. Foreign state is
+skipped even with `--rebuild`; choose a separate file. A malformed checkpoint
+must be preserved or removed deliberately before rebuilding. Limits are 50,000
+items, 1,000,000 event rows per invocation (including anchor verification) and
+64 MiB per checkpoint. No scan silently truncates.
+
+Keep this derived cache in a trusted, ignored file: it includes item ids,
+dependency hashes, outcome bits and bounded finding excerpts. Its checksum
+detects accidental damage; it is not an authenticity signature. The file adapter
+uses a core token-owned lease, checks current checkpoint ownership and re-reads
+all source revisions through the SDK before fenced atomic publication. Peers'
+checkpoints and foreign records are preserved. Native item state is read only.
+Checkpoint and baseline publication finishes all awaited work before a final
+synchronous generation/byte/access-policy check and rename under its held lease
+or lock. New sidecars are owner-only (`0600` or stricter under the umask);
+existing access bits, owner and group are retained. Staging files stay private
+until commit, and cleanup verifies staging identity, owned bytes and access
+policy before unlinking. Foreign data is retained even when it overwrites the
+same staging inode.
+
+The typed SDK exposes `lintIncremental`, `IncrementalLintSource`,
+`IncrementalCheckpoint`, strict checkpoint/request parsers, `RULE_DEPENDENCIES`
+and `IncrementalRefusal`. A source injects native SDK complete reads, event pages
+and configured policy/roles, so hosted adapters can use their own compare-and-set
+checkpoint storage. The optional `filesystemLintSource` / `lintIncrementalFile`
+adapter implements the CLI's local cache. See the [SDK example](docs/incremental-example.md)
+and [measured validation](docs/incremental-validation.md).
 
 ## Install and release approval
 
@@ -114,7 +177,7 @@ pm lint --json --output-include item_id,rule,rule_version,source_digest
 # Copy one observed finding's identity, version and digest; review its full source.
 pm lint acknowledge --baseline lint-baseline.json \
   --id project-abcd --rule PML002 --reason 'Legacy criteria debt; repair scheduled' \
-  --rule-version 1 --source-digest <observed-sha256>
+  --rule-version <observed-version> --source-digest <observed-sha256>
 pm lint --baseline lint-baseline.json --json
 pm lint --baseline lint-baseline.json \
   --output-include item_id,rule,disposition --output-budget 2000
@@ -202,7 +265,7 @@ backend. No witness command changes tracker data. See the
 
 ## Without git
 
-Linting, rule listing, acknowledgment, baseline checks and witness checks work in plain directory trackers without a git executable. These commands do not require repository history. The SDK baseline model is independent of git and tracker storage; CLI baseline files use the local filesystem.
+Linting, incremental checkpoints, rule listing, acknowledgment, baseline checks and witness checks work in plain directory trackers without a git executable. These commands do not require repository history. The SDK baseline model is independent of git and tracker storage; CLI baseline and checkpoint files use the local filesystem.
 
 | Code | Default severity | Default scope | Field | Checks |
 | --- | --- | --- | --- | --- |
@@ -217,7 +280,7 @@ Linting, rule listing, acknowledgment, baseline checks and witness checks work i
 | PML009 | error | blocked | blocked_reason | Missing blocker reason or unresolvable local blocker |
 | PML010 | warn | active | title | Active titles form SDK duplicate clusters |
 
-Authoring rules skip closed and canceled history by default. `non_terminal` and `active` cover unfinished statuses, including blocked and draft. PML010 uses the SDK's duplicate corpus of open, in-progress and blocked items. Scope restricts which items emit findings; hierarchy and duplicate context still use the complete corpus. A per-rule `scope` setting changes that default; explicit `--status` takes precedence over settings and evaluates every enabled rule on the named lifecycle. Rule-specific conditions still apply (for example, PML002 checks only work types and PML005 checks in-progress or owned work).
+Authoring rules skip terminal history by default. `non_terminal` and `active` cover unfinished statuses, including blocked and draft. PML010 uses statuses carrying the SDK registry's active or blocked roles. Scope restricts which items emit findings; hierarchy and duplicate context still use the complete corpus. A per-rule `scope` setting changes that default; explicit `--status` takes precedence over settings and evaluates every enabled rule on the named lifecycle. Rule-specific conditions still apply (for example, PML002 checks only work types and PML005 checks working or owned work). Working statuses carry the active role without default-open; custom status names retain those semantics.
 
 PML003 deliberately flags vague assertions rather than requiring every fragment to match a verb whitelist. `works`, `done`, `fixed`, `complete`, `ok`, `as expected`, `looks good`, `should work`, `TBD`, `N/A`, and `see description` are rejected, as are assertions identical to the title. Concrete examples such as `pm-cli-data.json regenerated`, `Any drifted snippet is corrected in all locales`, and `Publication and deployment state distinguished from candidate validation` pass. Semicolons and newlines delimit assertions; the first vague fragment produces one item-level finding. This conservative heuristic does not prove that an outcome is true or sufficiently specified.
 
@@ -240,7 +303,7 @@ Place a `lint` section in the tracker's `settings.json`:
 }
 ```
 
-All rules start enabled. Settings apply enable/disable lists, then per-rule entries, then CLI overrides. Supported severities are `error`, `warn`, and `info`. Supported scopes are `all`, `non_terminal`, `active`, `terminal`, `closed`, `canceled`, `open`, `in_progress`, and `blocked`. `terminal` includes closed and canceled items; single-status scopes match exactly. `staleDays` must be finite and positive; duplicate `threshold` must be greater than zero and at most one. Unknown codes, parameters, keys and invalid values are errors. The current SDK strips custom sections from `readSettings`, so the package validates core settings through that API and retrieves the custom section using public SDK settings-path and storage helpers.
+All rules start enabled. Settings apply enable/disable lists, then per-rule entries, then CLI overrides. Supported severities are `error`, `warn`, and `info`. Supported scopes are `all`, `non_terminal`, `active`, `terminal`, `closed`, `canceled`, `open`, `in_progress`, and `blocked`. Lifecycle scopes use configured SDK registry roles: closed means terminal-done, canceled means terminal-canceled, open means default-open, and in-progress means active without default-open. `staleDays` must be finite and positive; duplicate `threshold` must be greater than zero and at most one. Unknown codes, parameters, keys and invalid values are errors. The current SDK strips custom sections from `readSettings`, so the package validates core settings through that API and retrieves the custom section using public SDK settings-path and storage helpers.
 
 Exit code `0` means no finding met the failure threshold. Exit code `1` means one or more findings met it. Invalid arguments, settings, incomplete storage, or refused duplicate analysis cause a host error and nonzero exit, rather than a clean lint receipt.
 
