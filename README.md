@@ -79,6 +79,32 @@ The commands use the host renderer: TOON by default and global `--json` for auto
 
 `pm lint rules` lists each rule's code, default severity, default scope, field, description, hint and settings key.
 
+## Install and release approval
+
+The first npm release is pending the maintainer's interactive bootstrap. After
+that first publish, the maintainer configures npm trusted publishing for
+`release.yml` and sets the repository variable `PM_RELEASE_APPROVED` to `true`.
+The daily workflow and manual dispatch both require this variable and `main`.
+Publishing uses OIDC with provenance; no stored npm token is needed.
+
+Once published, install the package and compatible pm host, then activate the
+extension in an initialized pm project:
+
+```sh
+npm install @unbrained/pm-lint @unbrained/pm-cli
+npx --no-install pm package install ./node_modules/@unbrained/pm-lint
+
+bun add @unbrained/pm-lint @unbrained/pm-cli
+bunx --bun --no-install pm package install ./node_modules/@unbrained/pm-lint
+
+pm package install npm:@unbrained/pm-lint
+pm lint --help
+```
+
+The package exports its SDK through `main` and `types` and registers commands
+with pm. It has no standalone `bin`: use `npx pm` or `bunx --bun pm` through
+the installed host. npm/Bun dependency installation alone does not activate it.
+
 ## Evidence-backed baselines
 
 Use a baseline to keep specific old findings visible while failing every new finding. Each finding now includes `rule_version`, a SHA-256 `source_digest` of its full canonical source item, and `disposition` (`new` or `debt`). Digests include all item metadata and full text, including text beyond the displayed excerpt. Any source-item change invalidates its acknowledgments; unrelated new items preserve existing debt. Rule semantics changes require a `RULE_VERSION` increment and invalidate older evidence.
@@ -225,7 +251,7 @@ A tracker quality gate can start with errors and progressively adopt warnings:
 - run: pm lint --fail-on error --json
 ```
 
-Run the host in a workspace where the package is activated. The package's own `release:check` covers identity/privacy, TypeScript, ESLint, jscpd, docstrings, all authored source coverage, production audit, package contents, changelog, release attestation and packed npm/native-Bun consumers. New packages stay unreleased until maintainer approval; the release workflow is dispatch-only and additionally gated by `PM_LINT_RELEASE_ENABLED`.
+Run the host in a workspace where the package is activated. The package's own `release:check` covers identity/privacy, TypeScript, ESLint, jscpd, docstrings, all authored source coverage, production audit, package contents, changelog, release attestation and packed npm/native-Bun consumers. Scheduled and manual GitHub releases require `PM_RELEASE_APPROVED=true` on the canonical repository's main branch. Local npm publication remains a maintainer-authenticated action with prepublish checks.
 
 Dogfood receipts, heuristic tuning decisions, coverage and behavioural revert proofs are recorded in the package tracker. The aggregate before/after corpus comparison and hand-checked PML003 sample are in [the dogfood report](docs/dogfood-round.md). Public evidence contains only aggregate counts and generic verdicts; raw titles, criteria and tracker configuration stay out of the repository.
 
@@ -349,3 +375,10 @@ Repair previews work in plain directory trackers without git. They require local
 tracker storage for byte-bound evidence; hosted database/network execution is not
 attested. See [the SDK example](docs/repair-preview-example.md) and
 [validation evidence](docs/repair-preview-validation.md).
+
+Every workflow job granted write permissions, including CodeQL, Dependabot and
+reusable workflow calls, requires the exact repository `unbraind/pm-lint`.
+The approval variable controls GitHub releases; it does not impose a local npm
+publishing hold. Maintainers run the prepublish checks and authenticate with npm
+for local publication. The first local publish uses `--provenance=false`; daily
+GitHub OIDC releases keep provenance enabled.

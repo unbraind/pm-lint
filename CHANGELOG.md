@@ -22,6 +22,7 @@
 
 ### Other
 
+- Release readiness behind PM_RELEASE_APPROVED ([pm-lint-release-gate](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-release-gate.toon))
 - Publish pm-lint as @unbrained/pm-lint ([pm-lint-scoped-npm-name](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-scoped-npm-name.toon))
 - Use the pm SDK for baseline command refusals ([pm-lint-sdk-adoption-1025](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-sdk-adoption-1025.toon))
 - Reconcile stale in-progress tracker records (2026-10-23) ([pm-lint-reconcile-1023](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-reconcile-1023.toon))
