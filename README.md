@@ -251,7 +251,7 @@ A tracker quality gate can start with errors and progressively adopt warnings:
 - run: pm lint --fail-on error --json
 ```
 
-Run the host in a workspace where the package is activated. The package's own `release:check` covers identity/privacy, TypeScript, ESLint, jscpd, docstrings, all authored source coverage, production audit, package contents, changelog, release attestation and packed npm/native-Bun consumers. New packages stay unreleased until maintainer approval; the release workflow is dispatch-only and additionally gated by `PM_RELEASE_APPROVED`.
+Run the host in a workspace where the package is activated. The package's own `release:check` covers identity/privacy, TypeScript, ESLint, jscpd, docstrings, all authored source coverage, production audit, package contents, changelog, release attestation and packed npm/native-Bun consumers. Scheduled and manual GitHub releases require `PM_RELEASE_APPROVED=true` on the canonical repository's main branch. Local npm publication remains a maintainer-authenticated action with prepublish checks.
 
 Dogfood receipts, heuristic tuning decisions, coverage and behavioural revert proofs are recorded in the package tracker. The aggregate before/after corpus comparison and hand-checked PML003 sample are in [the dogfood report](docs/dogfood-round.md). Public evidence contains only aggregate counts and generic verdicts; raw titles, criteria and tracker configuration stay out of the repository.
 
@@ -376,5 +376,9 @@ tracker storage for byte-bound evidence; hosted database/network execution is no
 attested. See [the SDK example](docs/repair-preview-example.md) and
 [validation evidence](docs/repair-preview-validation.md).
 
-Release jobs with write permissions are restricted to `unbraind/pm-lint` at job
-level, so a fork cannot run publication with its own approval variable.
+Every workflow job granted write permissions, including CodeQL, Dependabot and
+reusable workflow calls, requires the exact repository `unbraind/pm-lint`.
+The approval variable controls GitHub releases; it does not impose a local npm
+publishing hold. Maintainers run the prepublish checks and authenticate with npm
+for local publication. The first local publish uses `--provenance=false`; daily
+GitHub OIDC releases keep provenance enabled.
