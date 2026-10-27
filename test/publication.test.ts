@@ -272,6 +272,31 @@ test('staging metadata failures close their handles and never replace the target
   assert.equal(await readFile(path, 'utf8'), 'original');
 });
 
+test('both public writer adapters close newly opened handles when stage metadata cannot be read', async t => {
+  const { writers } = await fixture(t);
+  for (const writer of writers) {
+    await writer.create();
+    const original = await readFile(writer.path);
+    const originalOpen = fsPromises.open;
+    const handles: Awaited<ReturnType<typeof open>>[] = [];
+    const mock = t.mock.method(fsPromises, 'open', async (...args: Parameters<typeof open>) => {
+      const handle = await originalOpen(...args);
+      if (String(args[0]).startsWith(writer.path + '.')) {
+        handles.push(handle);
+        t.mock.method(handle, 'stat', async () => { throw new Error('unreadable stage metadata'); });
+      }
+      return handle;
+    });
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(writer.update(), error => error instanceof IncrementalRefusal || error instanceof BaselineRefusal);
+      assert.ok(handles.length > 0);
+      assert.ok(handles.every(handle => handle.fd === -1));
+      assert.deepEqual(await readFile(writer.path), original);
+    } finally { mock.mock.restore(); syncBuiltinESMExports(); }
+  }
+});
+
 test('replacements retain an existing authorized group rather than inheriting the staging directory group', async t => {
   const { root } = await tracker(t);
   const group = process.getgroups?.().find(value => value !== process.getgid?.());

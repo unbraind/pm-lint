@@ -63,6 +63,9 @@ existing `0400` file to `0600`. No original regressions were weakened or removed
 Restoring only inode-based staging cleanup also deletes the in-place foreign
 payload; the corrected cleanup retains it. Focused publication/baseline tests
 pass 21/21 with 100/100/100/100 shared-publisher coverage.
+The final focused set also includes all original incremental regressions and
+adapter metadata-failure checks: 31/31 passed, with 100/100/100/100 measured for
+both writer adapters and the shared publisher.
 
 Packed acceptance (`npm run test:install`) passed one integration test with
 zero failures, skips, cancellations or todo cases. It exercises npm and Bun

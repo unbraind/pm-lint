@@ -46,7 +46,8 @@ export async function acknowledgeBaselineFile(path: string, findings: readonly F
 /** Retain exclusive ownership until publication, cleaning up only this writer's unpublished lock. */
 async function publishBaseline(lock: FileHandle, path: string, findings: readonly Finding[], request: Acknowledgment): Promise<LintBaseline> {
   const lockPath = `${path}.lock`;
-  const owned = await lock.stat({ bigint: true });
+  let owned;
+  try { owned = await lock.stat({ bigint: true }); } catch (error) { await lock.close(); throw error; }
   let publication;
   try {
     const observed = readSidecarSnapshot(path, Number.MAX_SAFE_INTEGER);
