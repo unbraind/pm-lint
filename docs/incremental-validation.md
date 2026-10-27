@@ -61,14 +61,31 @@ overwrites a final-policy replacement and creates `0666` under umask `000`; the
 old baseline publisher overwrites a replacement during sync and changes an
 existing `0400` file to `0600`. No original regressions were weakened or removed.
 Restoring only inode-based staging cleanup also deletes the in-place foreign
-payload; the corrected cleanup retains it. Focused publication/baseline tests
-pass 21/21 with 100/100/100/100 shared-publisher coverage.
-The final focused set also includes all original incremental regressions and
-adapter metadata-failure checks: 31/31 passed, with 100/100/100/100 measured for
-both writer adapters and the shared publisher.
+payload; the corrected cleanup retains it. The final focused set includes all
+original incremental regressions and adapter metadata-failure checks: 31/31
+passed, with 100/100/100/100 measured for both writer adapters and the shared
+publisher.
 
-Packed acceptance (`npm run test:install`) passed one integration test with
-zero failures, skips, cancellations or todo cases. It exercises npm and Bun
-global hosts, npx/native bunx, direct project-local CLI entrypoints and the
-packed incremental SDK. The run took 515,980 ms on the shared host. Full npm
-and Bun release-gate counts remain separate CI evidence.
+The complete local release gates passed serially at source commit `208f70f`,
+using isolated home directories and Git configuration, Node 24.19.0, npm 11.17.0
+and Bun 1.3.5. Test concurrency remained at most two; thresholds were unchanged.
+
+| Command | Main tests | Packed acceptance | Coverage | Total measured time |
+| --- | ---: | ---: | --- | ---: |
+| `npm run release:check` | 179/179 | 1/1 | 100/100/100/100 | 1,804,238 ms |
+| `bun run release:check` | 179/179 | 1/1 | 100/100/100/100 | 2,292,750 ms |
+
+Both runs had zero failures, skips, cancellations or todo cases. All 30 measured
+source files met every coverage threshold. Typecheck, lint, zero-duplication,
+docstrings, identity, production audit, dry packing, changelog and publication
+attestation checks passed. Packed acceptance covers npm and Bun global hosts,
+npx/native bunx, direct project-local CLI entrypoints and the packed incremental
+SDK. Its final-policy replacement and permission assertions use the packed SDK;
+the two packed runs took 454,550 ms and 424,134 ms respectively.
+
+The subsequent merge of `815ec63` changes only another tracker item's closure
+evidence. Product source, tests, scripts and dependency files remain identical
+to the full-gate source commit. Final tracker/docs receipts are checked with
+tracker health, identity, changelog and diff validation. Pushed-head CI results
+are linked from [PR 32 checks](https://github.com/unbraind/pm-lint/pull/32/checks);
+local source-gate results and CI results are separate receipts.
