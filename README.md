@@ -4,7 +4,7 @@ Project management = context management. Vague work items waste agent time becau
 
 The npm package is `@unbrained/pm-lint`. The pm extension identity, catalog display name and command names remain `pm-lint`: existing `pm lint` commands do not change. The public package homepage remains <https://pm-cli.unbrained.dev/packages/pm-lint>.
 
-This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.20`; Node `>=22.18.0`.
+This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.23`; Node `>=22.18.0`.
 
 With a pm host already installed, activate the registry package in your tracker:
 
@@ -54,7 +54,7 @@ npm pack
 In a fresh directory outside any Git repository, install the host and initialize a tracker, then install the packed artifact (copy it into that directory first):
 
 ```sh
-npm install @unbrained/pm-cli@2026.10.20
+npm install @unbrained/pm-cli@2026.10.23
 npx pm init lint-consumer --defaults --agent-guidance skip
 npx pm install ./unbrained-pm-lint-2026.10.13.tgz
 npx pm lint --json
