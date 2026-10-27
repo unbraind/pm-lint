@@ -89,3 +89,11 @@ to the full-gate source commit. Final tracker/docs receipts are checked with
 tracker health, identity, changelog and diff validation. Pushed-head CI results
 are linked from [PR 32 checks](https://github.com/unbraind/pm-lint/pull/32/checks);
 local source-gate results and CI results are separate receipts.
+
+The bounded CI watch at `74774ab` reached approximately 30 minutes with both
+Node 22 and Node 26 jobs still queued and zero executed steps in
+[run 40499927461](https://github.com/unbraind/pm-lint/actions/runs/40499927461).
+[CodeQL](https://github.com/unbraind/pm-lint/actions/runs/40499927369) was also
+queued. No new CI gate pass is claimed. This final tracker/docs receipt does
+not change implementation or tests; its own CI remains separate at PR checks.
+The orchestrator pipeline continues final-head checks and re-review.
