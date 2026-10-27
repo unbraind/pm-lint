@@ -375,3 +375,6 @@ Repair previews work in plain directory trackers without git. They require local
 tracker storage for byte-bound evidence; hosted database/network execution is not
 attested. See [the SDK example](docs/repair-preview-example.md) and
 [validation evidence](docs/repair-preview-validation.md).
+
+Release jobs with write permissions are restricted to `unbraind/pm-lint` at job
+level, so a fork cannot run publication with its own approval variable.
