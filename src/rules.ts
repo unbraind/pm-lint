@@ -1,6 +1,8 @@
 import { RelationshipKindRegistry } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import type { RuleCode, RuleScope, Severity } from './types.ts';
+import { DEFAULT_STATUSES } from './statuses.ts';
+import type { LintStatusRegistry } from './statuses.ts';
 
 /** Certified tracker context and deterministic rule tuning supplied by the engine. */
 export interface RuleContext {
@@ -8,6 +10,7 @@ export interface RuleContext {
   now: number;
   parameters: Record<string, number>;
   duplicateIds: ReadonlySet<string>;
+  statuses?: LintStatusRegistry;
 }
 
 /** One stable authoring rule with its documented defaults and static remediation hint. */
@@ -107,7 +110,9 @@ function missingClosureEvidence(item: ItemMetadata): boolean {
 
 /** Detect stale in-progress work and stale claims, using the most recent recorded activity. */
 function staleWork(item: ItemMetadata, context: RuleContext): boolean {
-  if (item.status !== 'in_progress' && !hasText(item.assignee) && !hasText(item.claim_principal)) return false;
+  const statuses = context.statuses ?? DEFAULT_STATUSES;
+  const working = statuses.active_statuses.has(item.status) && !statuses.by_id.get(item.status)?.roles.includes('default_open');
+  if (!working && !hasText(item.assignee) && !hasText(item.claim_principal)) return false;
   const activity = [item.updated_at, ...(item.comments ?? []).map(/** Comments are observable work activity. */ entry => entry.created_at), ...(item.notes ?? []).map(/** Notes can carry work evidence. */ entry => entry.created_at), ...(item.test_runs ?? []).map(/** Completed test runs are substantive activity. */ entry => entry.recorded_at)];
   const valid = activity.map(/** Parse SDK timestamps without inventing an update. */ text => Date.parse(text)).filter(/** Structural date errors belong to pm validate. */ time => Number.isFinite(time));
   return valid.length > 0 && context.now - Math.max(...valid) > (context.parameters.staleDays ?? 14) * 86400000;

@@ -7,6 +7,9 @@ import { readLintSettings, resolveConfig } from './settings.ts';
 import type { LintOptions } from './settings.ts';
 import type { Finding, LintConfig, RuleCode, RuleScope, Severity } from './types.ts';
 import { assertBaselinePolicy, isAcknowledged, parseBaseline, RULE_VERSION, sourceDigest } from './baseline.ts';
+import { DEFAULT_STATUSES, readLintStatuses } from './statuses.ts';
+import type { LintStatusRegistry } from './statuses.ts';
+import type { Rule, RuleContext } from './rules.ts';
 
 /** Privacy-conscious lint result with corpus certification and deterministic exit status. */
 export interface LintResult {
@@ -37,11 +40,15 @@ export function excerptText(value: string): string {
 }
 
 /** Decide whether one item status falls inside a rule's lifecycle scope. */
-export function inScope(scope: RuleScope, status: string): boolean {
+export function inScope(scope: RuleScope, status: string, registry: LintStatusRegistry = DEFAULT_STATUSES): boolean {
   if (scope === 'all') return true;
-  if (scope === 'non_terminal' || scope === 'active') return status !== 'closed' && status !== 'canceled';
-  if (scope === 'terminal') return status === 'closed' || status === 'canceled';
-  return status === scope;
+  if (scope === 'non_terminal' || scope === 'active') return !registry.terminal_statuses.has(status);
+  if (scope === 'terminal') return registry.terminal_statuses.has(status);
+  if (scope === 'closed') return registry.terminal_done_statuses.has(status);
+  if (scope === 'canceled') return registry.terminal_canceled_statuses.has(status);
+  if (scope === 'blocked') return registry.blocked_statuses.has(status);
+  const open = registry.by_id.get(status)?.roles.includes('default_open') === true;
+  return scope === 'open' ? open : registry.active_statuses.has(status) && !open;
 }
 
 /** Parse a comma-separated status selection into nonempty status tokens. */
@@ -71,8 +78,8 @@ function selectItems(items: readonly ItemMetadata[], options: LintOptions): Item
 }
 
 /** Reconcile the SDK duplicate scan with certified active counts before using its findings. */
-export function duplicateItemIds(result: DuplicateItemsAnalysis, items: readonly ItemMetadata[]): Set<string> {
-  const active = items.filter(/** Match the SDK duplicate operation's explicit lifecycle selection. */ item => ['open', 'in_progress', 'blocked'].includes(item.status));
+export function duplicateItemIds(result: DuplicateItemsAnalysis, items: readonly ItemMetadata[], registry: LintStatusRegistry = DEFAULT_STATUSES): Set<string> {
+  const active = items.filter(/** Match the SDK duplicate operation's explicit lifecycle selection. */ item => registry.active_statuses.has(item.status) || registry.blocked_statuses.has(item.status));
   if (result.cost.item_count !== active.length) throw new Error('Duplicate source does not match the certified corpus');
   if (result.count >= 1000) throw new Error('SDK duplicate cluster cap reached; completeness cannot be proven');
   const ids = new Set<string>();
@@ -87,19 +94,22 @@ export async function lintItems(client: PmClient, pmRoot: string, options: LintO
   const config = resolveConfig(await readLintSettings(pmRoot), options);
   const baseline = options.baseline === undefined ? undefined : parseBaseline(options.baseline);
   if (baseline !== undefined) assertBaselinePolicy(config, resolveConfig(undefined), options);
-  return lintCorpus(await client.listAllComplete(), config, options, now);
+  return lintCorpus(await client.listAllComplete(), config, options, now, await readLintStatuses(pmRoot));
 }
 
+/** Optional evaluation strategy; rendering and complete result accounting remain shared. */
+export type RuleEvaluator = (rule: Rule, item: ItemMetadata, context: RuleContext) => { matched: boolean; excerpt: string };
+
 /** Evaluate an SDK-certified snapshot with the same rule engine used by ordinary lint. */
-export function lintCorpus(source: PmCompleteListResult, config: LintConfig, options: LintOptions = {}, now: number = Date.now()): LintResult {
+export function lintCorpus(source: PmCompleteListResult, config: LintConfig, options: LintOptions = {}, now: number = Date.now(), statuses: LintStatusRegistry = DEFAULT_STATUSES, evaluate: RuleEvaluator = evaluateRule): LintResult {
   const baseline = options.baseline === undefined ? undefined : parseBaseline(options.baseline);
   const corpus = certifyCompleteListResult(source);
   const selected = selectItems(corpus.items, options);
   let duplicateIds = new Set<string>();
   if (config.rules.PML010.enabled) {
-    const active = corpus.items.filter(/** The SDK receives only the certified active lifecycle corpus. */ item => ['open', 'in_progress', 'blocked'].includes(item.status));
+    const active = corpus.items.filter(/** The SDK receives only the registry's active lifecycle corpus. */ item => statuses.active_statuses.has(item.status) || statuses.blocked_statuses.has(item.status));
     const duplicates = analyzeDuplicateItems(active, { threshold: config.rules.PML010.parameters.threshold ?? 0.92, limit: 1000 });
-    duplicateIds = duplicateItemIds(duplicates, corpus.items);
+    duplicateIds = duplicateItemIds(duplicates, corpus.items, statuses);
   }
   const findings: Finding[] = [];
   const summary = Object.fromEntries(RULES.map(/** Every rule reports a stable per-severity count, zero included. */ rule => [rule.code, { info: 0, warn: 0, error: 0 }])) as Record<RuleCode, Record<Severity, number>>;
@@ -108,10 +118,11 @@ export function lintCorpus(source: PmCompleteListResult, config: LintConfig, opt
       const effective = config.rules[rule.code];
       if (!effective.enabled) continue;
       // An explicit --status selection overrides every rule's scope: the caller named the lifecycle to judge.
-      if (options.status === undefined && !inScope(effective.scope, item.status)) continue;
-      const context = { items: corpus.items, now, parameters: effective.parameters, duplicateIds };
-      if (!rule.check(item, context)) continue;
-      const finding: Finding = { item_id: item.id, rule: rule.code, rule_version: RULE_VERSION, source_digest: sourceDigest(item), disposition: 'new', severity: effective.severity, field: rule.field, hint: rule.hint, title: item.title, excerpt: excerptText(rule.excerpt?.(item, context) ?? '') };
+      if (options.status === undefined && !inScope(effective.scope, item.status, statuses)) continue;
+      const context = { items: corpus.items, now, parameters: effective.parameters, duplicateIds, statuses };
+      const verdict = evaluate(rule, item, context);
+      if (!verdict.matched) continue;
+      const finding: Finding = { item_id: item.id, rule: rule.code, rule_version: RULE_VERSION, source_digest: sourceDigest(item), disposition: 'new', severity: effective.severity, field: rule.field, hint: rule.hint, title: item.title, excerpt: verdict.excerpt };
       if (baseline !== undefined && isAcknowledged(finding, baseline)) finding.disposition = 'debt';
       findings.push(finding);
       summary[rule.code][effective.severity] += 1;
@@ -122,4 +133,10 @@ export function lintCorpus(source: PmCompleteListResult, config: LintConfig, opt
   const staleCount = baseline === undefined ? 0 : baseline.acknowledgments.length - debtCount;
   const failed = findings.some(/** Baseline gates fail every new finding; ordinary lint retains severity policy. */ finding => baseline === undefined ? SEVERITY_RANK[finding.severity] >= SEVERITY_RANK[config.failOn] : finding.disposition === 'new');
   return { findings, debt_count: debtCount, new_count: findings.length - debtCount, stale_count: staleCount, count: findings.length, scanned: selected.length, corpus_count: corpus.items.length, summary, complete_list: corpus.complete_list, fail_on: baseline === undefined ? config.failOn : 'info', exit_code: failed ? 1 : 0 };
+}
+
+/** Default full-scan evaluator; incremental scans replace only this predicate call. */
+export function evaluateRule(rule: Rule, item: ItemMetadata, context: RuleContext): ReturnType<RuleEvaluator> {
+  const matched = rule.check(item, context);
+  return { matched, excerpt: matched ? excerptText(rule.excerpt?.(item, context) ?? '') : '' };
 }
