@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { open, realpath } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { acquireLockLease, certifyCompleteListResult, listMutationEvents, PmClient, writeFileAtomic } from '@unbrained/pm-cli/sdk';
+import { acquireLockLease, certifyCompleteListResult, listMutationEvents, PmClient } from '@unbrained/pm-cli/sdk';
 import { sourceDigest } from './baseline.ts';
 import { INCREMENTAL_LIMITS, IncrementalRefusal, parseIncrementalCheckpoint, parseIncrementalRequest } from './incremental-contract.ts';
 import type { IncrementalCheckpoint } from './incremental-contract.ts';
@@ -10,6 +10,7 @@ import { lintIncremental } from './incremental.ts';
 import type { IncrementalBoundary, IncrementalLintResult, IncrementalLintSource } from './incremental.ts';
 import { readLintSettings, resolveConfig } from './settings.ts';
 import { readLintStatuses } from './statuses.ts';
+import { prepareSidecarPublication, readSidecarSnapshot, SidecarConflict } from './sidecar-publication.ts';
 
 /** File-wrapper boundaries let integration tests inject real peer transitions at every await. */
 export type IncrementalFileBoundary = IncrementalBoundary | 'locked' | 'loaded' | 'publish' | 'published' | 'release';
@@ -68,25 +69,27 @@ export async function lintIncrementalFile(source: IncrementalLintSource, statePa
   }
   try {
     await onBoundary?.('locked');
-    const previous = await readIncrementalCheckpoint(path);
+    let observed;
+    try { observed = readSidecarSnapshot(path, INCREMENTAL_LIMITS.bytes); } catch {
+      throw new IncrementalRefusal('state_io', 'Cannot read the checkpoint generation.', 'Use a readable regular checkpoint within the documented byte ceiling.');
+    }
+    const previous = observed === undefined ? undefined : decodeIncrementalCheckpoint(observed.bytes, observed.bytes.length);
     await onBoundary?.('loaded');
     const result = await lintIncremental(source, { rebuild, ...(previous === undefined ? {} : { checkpoint: previous }) }, onBoundary);
     await onBoundary?.('publish');
-    // Detect foreign or uncooperative writers as well as cooperating lease contention.
-    const latest = await readIncrementalCheckpoint(path);
-    if (latest?.digest !== previous?.digest) throw new IncrementalRefusal('source_changed', 'A peer replaced the checkpoint; its success was preserved.', 'Retry from the peer checkpoint; no saved plan is replayed.');
     const current = certifyCompleteListResult(await source.client.listAllComplete());
     const revisions = current.items.map(/** Revalidate every source revision through the SDK before publishing derived state. */ item => [item.id, sourceDigest(item)]).sort();
     const expected = result.checkpoint.items.map(/** Source order is irrelevant to the complete snapshot. */ item => [item.id, item.source_digest]).sort();
     const policy = await source.policy();
     if (sourceDigest(revisions) !== sourceDigest(expected) || sourceDigest({ config: policy.config, statuses: policy.statuses.definitions }) !== result.checkpoint.policy_digest) throw new IncrementalRefusal('source_changed', 'Current SDK revisions no longer match the evaluated snapshot.', 'Retry against current SDK state; no stale checkpoint was published.');
+    let publication;
     try {
-      await lease.fence(/** Core checks lease ownership immediately before replacing the state. */ async () => {
-        await writeFileAtomic(path, `${JSON.stringify(result.checkpoint)}\n`);
-      });
-    } catch {
+      publication = await prepareSidecarPublication(path, `${JSON.stringify(result.checkpoint)}\n`, observed, INCREMENTAL_LIMITS.bytes);
+      await lease.fence(/** Core fences ownership; the final target check and replacement do not yield. */ async () => { publication!.commit(); });
+    } catch (error) {
+      if (error instanceof SidecarConflict) throw new IncrementalRefusal('source_changed', error.message, 'Retry from the current checkpoint; foreign and peer state was preserved.');
       throw new IncrementalRefusal('state_io', 'Checkpoint publication failed.', 'Verify storage and lease ownership, then retry from the current checkpoint.');
-    }
+    } finally { publication?.dispose(); }
     await onBoundary?.('published');
     return result;
   } finally {

@@ -48,6 +48,19 @@ injects SDK source edits at all nine prepublication boundaries. A lost actual
 core lease cannot publish, a changed source cannot advance the saved checkpoint,
 and foreign or peer state remains untouched. No SDK mocks are used.
 
+Review follow-up audits both durable sidecar writers, including baseline
+acknowledgments. `test/publication.test.ts` injects a foreign target after every
+actual SDK read and each staging await, including the final SDK policy read and
+durable sync. It covers staging-inode replacement, identical-byte replacement,
+creation/deletion/mode drift, torn reads, owner/group preservation and private
+creation in a traversable directory under a permissive umask. Both JSON and TOON
+CLI paths and packed npm/Bun consumers check that `0600` stays `0600`.
+
+Function-only revert proofs fail for each writer: the old checkpoint publisher
+overwrites a final-policy replacement and creates `0666` under umask `000`; the
+old baseline publisher overwrites a replacement during sync and changes an
+existing `0400` file to `0600`. No original regressions were weakened or removed.
+
 Packed acceptance (`npm run test:install`) passed one integration test with
 zero failures, skips, cancellations or todo cases. It exercises npm and Bun
 global hosts, npx/native bunx, direct project-local CLI entrypoints and the

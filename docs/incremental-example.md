@@ -27,7 +27,7 @@ owns checkpoint persistence. Read its previous checkpoint inside a lease or
 compare-and-set loop, revalidate source revisions before publication and release
 ownership last. Never replay an old saved result as an item mutation plan.
 `lintIncrementalFile` provides these checks for local storage and uses core's
-owned lease and atomic writer. State must be a regular file in an existing
+owned lease and a guarded atomic publisher. State must be a regular file in an existing
 writable directory; peers using directory aliases share the same lock.
 
 The CLI returns the normal complete lint verdict plus an `incremental` receipt:
@@ -56,3 +56,9 @@ finding ceiling and are reused only with identical declared predicate inputs.
 The feature works without git. It neither launches git nor writes native item
 fields, scope, relationships, claims or journals. `--since`, item filters and
 baseline acknowledgments remain available on the ordinary lint command.
+
+Local checkpoint and baseline updates use one publisher: private staging,
+permission/ownership preservation and a final synchronous target-generation
+check immediately before replacement. A competing replacement during an SDK
+read, stage write, sync, close or lease-fence preparation is refused and retained.
+Callers and other writer processes must honor the sidecar's lease/lock protocol.

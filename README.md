@@ -126,6 +126,11 @@ detects accidental damage; it is not an authenticity signature. The file adapter
 uses a core token-owned lease, checks current checkpoint ownership and re-reads
 all source revisions through the SDK before fenced atomic publication. Peers'
 checkpoints and foreign records are preserved. Native item state is read only.
+Checkpoint and baseline publication finishes all awaited work before a final
+synchronous generation/byte/access-policy check and rename under its held lease
+or lock. New sidecars are owner-only (`0600` or stricter under the umask);
+existing access bits, owner and group are retained. Staging files stay private
+until commit, and cleanup unlinks only the staging inode this writer created.
 
 The typed SDK exposes `lintIncremental`, `IncrementalLintSource`,
 `IncrementalCheckpoint`, strict checkpoint/request parsers, `RULE_DEPENDENCIES`
