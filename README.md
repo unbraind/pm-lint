@@ -91,13 +91,13 @@ Once published, install the package and compatible pm host, then activate the
 extension in an initialized pm project:
 
 ```sh
-npm install pm-lint @unbrained/pm-cli
-npx --no-install pm package install ./node_modules/pm-lint
+npm install @unbrained/pm-lint @unbrained/pm-cli
+npx --no-install pm package install ./node_modules/@unbrained/pm-lint
 
-bun add pm-lint @unbrained/pm-cli
-bunx --bun --no-install pm package install ./node_modules/pm-lint
+bun add @unbrained/pm-lint @unbrained/pm-cli
+bunx --bun --no-install pm package install ./node_modules/@unbrained/pm-lint
 
-pm package install npm:pm-lint
+pm package install npm:@unbrained/pm-lint
 pm lint --help
 ```
 

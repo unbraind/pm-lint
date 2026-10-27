@@ -345,3 +345,54 @@ test('an unlisted workflow is discovered in a plain directory without Git', () =
     assert.match(inspectDirectory(directory).join('\n'), /new-security\.yaml:analyze: exact repository guard/u);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+/** Extract documented shell commands and inline examples without treating display names as packages. */
+function documentedCommands(source: string): string[] {
+  const snippets = [...source.matchAll(/```(?:sh|bash|shell|console)\n([\s\S]*?)```|`([^`\n]+)`/gu)].map(match => match[1] ?? match[2]);
+  return snippets.flatMap(snippet => snippet.replace(/\\\n\s*/gu, ' ').split('\n'))
+    .map(line => line.trim()).filter(line => /^(?:npm|npx|bun|bunx|pm)\s/u.test(line));
+}
+
+/** Compare package coordinates and activation paths with the manifest, preserving command identity. */
+function documentationPackageIssues(source: string, packageName: string): string[] {
+  const basename = packageName.split('/').at(-1);
+  assert.ok(basename);
+  const escaped = basename.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const coordinate = new RegExp(`^(?:npm:)?((?:@[^/@]+/)?${escaped})(?:@[^\\s]+)?$`, 'u');
+  const activation = new RegExp(`node_modules/((?:@[^/\\s]+/)?${escaped})(?:/|$)`, 'u');
+  return documentedCommands(source).flatMap(command => {
+    const tokens = command.match(/[^\s"'`]+/gu) ?? [];
+    return tokens.flatMap(token => {
+      const named = coordinate.exec(token)?.[1] ?? activation.exec(token)?.[1];
+      return named && named !== packageName ? [`package coordinate must be ${packageName}`] : [];
+    });
+  });
+}
+
+test('README install commands and public examples name the manifest package', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { name: string };
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const readme = readFileSync(join(root, 'README.md'), 'utf8');
+  const commands = documentedCommands(readme);
+  for (const runner of ['npm', 'npx', 'bun', 'bunx', 'pm']) {
+    assert.ok(commands.some(command => command.startsWith(`${runner} `) && command.includes(manifest.name)), `${runner} install/activation example must name ${manifest.name}`);
+  }
+  /** Read only repo-local documentation and examples, including nested Markdown guides. */
+  const files = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? files(path) : entry.isFile() && /\.(?:md|ts|json|sh)$/u.test(entry.name) ? [path] : [];
+  });
+  for (const path of [join(root, 'README.md'), ...files(join(root, 'docs')), ...files(join(root, 'examples'))]) {
+    assert.deepEqual(documentationPackageIssues(readFileSync(path, 'utf8'), manifest.name), [], relative(root, path));
+  }
+});
+
+test('documentation checks reject unscoped registry and activation examples', () => {
+  const packageName = '@unbrained/pm-lint';
+  for (const command of [
+    'npm install pm-lint', 'npx pm-lint', 'bun add pm-lint', 'bunx pm-lint',
+    'pm install npm:pm-lint', 'npx pm package install ./node_modules/pm-lint',
+    'bunx --bun pm package install ./node_modules/pm-lint',
+  ]) assert.match(documentationPackageIssues(`\`\`\`sh\n${command}\n\`\`\``, packageName).join('\n'), /package coordinate/u);
+  assert.deepEqual(documentationPackageIssues('`npm install @unbrained/pm-lint`', packageName), []);
+});
