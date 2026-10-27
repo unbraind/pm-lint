@@ -47,3 +47,9 @@ boundaries on one non-git tracker, including publication and release. Another
 injects SDK source edits at all nine prepublication boundaries. A lost actual
 core lease cannot publish, a changed source cannot advance the saved checkpoint,
 and foreign or peer state remains untouched. No SDK mocks are used.
+
+Packed acceptance (`npm run test:install`) passed one integration test with
+zero failures, skips, cancellations or todo cases. It exercises npm and Bun
+global hosts, npx/native bunx, direct project-local CLI entrypoints and the
+packed incremental SDK. The run took 515,980 ms on the shared host. Full npm
+and Bun release-gate counts remain separate CI evidence.
