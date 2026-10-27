@@ -24,6 +24,14 @@ async function fixture(t: Parameters<typeof tracker>[0]) {
   ] };
 }
 
+/** Obtain the real file-handle methods used by all publication fault injections. */
+async function publicationProbe(t: Parameters<typeof tracker>[0], root: string) {
+  const probe = await open(join(root, 'publication-probe'), 'w');
+  t.after(() => probe.close());
+  const prototype: typeof probe = Object.getPrototypeOf(probe);
+  return { probe, prototype };
+}
+
 test('every sidecar writer preserves restrictive modes and creates private files even with permissive umask', async t => {
   const { writers, root } = await fixture(t);
   await chmod(root, 0o755);
@@ -91,9 +99,7 @@ test('baseline refuses a foreign replacement during durable sync', async t => {
 
 test('every writer rechecks after staging awaits and never deletes a replaced staging inode', async t => {
   const { writers, root } = await fixture(t);
-  const probe = await open(join(root, 'file-handle-probe'), 'w');
-  t.after(() => probe.close());
-  const prototype: typeof probe = Object.getPrototypeOf(probe);
+  const { probe, prototype } = await publicationProbe(t, root);
   for (const writer of writers) {
     await writer.create();
     const original = await readFile(writer.path);
@@ -174,6 +180,42 @@ test('final commit refuses creation, deletion, identical-byte replacement and mo
     // Preserve the peer's target while preparing the next independent fixture.
     if (transition !== 'delete') await rename(path, join(root, `${transition}-peer-result`));
   }
+});
+
+test('both writers preserve foreign content written into their original staging inode', async t => {
+  const { root, writers } = await fixture(t);
+  const { probe, prototype } = await publicationProbe(t, root);
+  for (const writer of writers) {
+    await writer.create();
+    const original = await readFile(writer.path);
+    const implementation = prototype.sync;
+    let stage: string | undefined;
+    const mock = t.mock.method(prototype, 'sync', async function(this: typeof probe) {
+      await implementation.call(this);
+      const name = (await readdir(root)).find(name => name.startsWith(writer.path.slice(root.length + 1) + '.'));
+      if (name !== undefined) { stage = join(root, name); await writeFile(stage, 'foreign in-place data'); }
+    });
+    try {
+      await assert.rejects(writer.update());
+      assert.ok(stage);
+      assert.equal(await readFile(stage, 'utf8'), 'foreign in-place data');
+      assert.deepEqual(await readFile(writer.path), original);
+    } finally { mock.mock.restore(); }
+  }
+});
+
+test('cleanup leaves oversized foreign staging data alone instead of masking the publication conflict', async t => {
+  const { root } = await tracker(t);
+  const path = join(root, 'target.json');
+  await writeFile(path, 'original');
+  const publication = await prepareSidecarPublication(path, 'next', readSidecarSnapshot(path, 1024), 1024);
+  const stage = (await readdir(root)).find(name => name.startsWith('target.json.'));
+  assert.ok(stage);
+  await writeFile(join(root, stage), 'foreign data longer than the owned payload');
+  assert.throws(publication.commit, SidecarConflict);
+  assert.doesNotThrow(publication.dispose);
+  assert.equal(await readFile(join(root, stage), 'utf8'), 'foreign data longer than the owned payload');
+  assert.equal(await readFile(path, 'utf8'), 'original');
 });
 
 test('JSON and TOON non-git CLI consumers retain checkpoint permissions on every update', async t => {

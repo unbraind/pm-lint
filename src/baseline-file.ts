@@ -55,8 +55,7 @@ async function publishBaseline(lock: FileHandle, path: string, findings: readonl
     publication.commit();
     return baseline;
   } finally {
-    if (publication === undefined) await lock.close();
-    publication?.dispose();
-    removeOwnedStage(lockPath, owned);
+    if (publication === undefined) { await lock.close(); removeOwnedStage(lockPath, owned); }
+    else publication.dispose();
   }
 }

@@ -130,7 +130,9 @@ Checkpoint and baseline publication finishes all awaited work before a final
 synchronous generation/byte/access-policy check and rename under its held lease
 or lock. New sidecars are owner-only (`0600` or stricter under the umask);
 existing access bits, owner and group are retained. Staging files stay private
-until commit, and cleanup unlinks only the staging inode this writer created.
+until commit, and cleanup verifies staging identity, owned bytes and access
+policy before unlinking. Foreign data is retained even when it overwrites the
+same staging inode.
 
 The typed SDK exposes `lintIncremental`, `IncrementalLintSource`,
 `IncrementalCheckpoint`, strict checkpoint/request parsers, `RULE_DEPENDENCIES`

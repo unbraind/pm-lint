@@ -1,4 +1,4 @@
-import { constants, lstatSync, openSync, fstatSync, readSync, closeSync, renameSync, unlinkSync, chmodSync, chownSync } from 'node:fs';
+import { constants, openSync, fstatSync, readSync, closeSync, renameSync, unlinkSync, chmodSync, chownSync } from 'node:fs';
 import type { BigIntStats } from 'node:fs';
 import { open } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
@@ -38,10 +38,16 @@ export function readSidecarSnapshot(path: string, maxBytes: number): SidecarSnap
   } finally { closeSync(fd); }
 }
 
-/** Remove only the staging inode created by this invocation, never a replacement at its pathname. */
-export function removeOwnedStage(path: string, owned: BigIntStats): void {
-  const current = lstatSync(path, { bigint: true, throwIfNoEntry: false });
-  if (current?.dev === owned.dev && current.ino === owned.ino) unlinkSync(path);
+/** Access policy applied by this invocation, separate from any foreign metadata change. */
+interface StagePolicy { mode: number; uid: number; gid: number }
+
+/** Remove only owned bytes and metadata, including when a foreign writer edits the same inode. */
+export function removeOwnedStage(path: string, owned: BigIntStats, contents = Buffer.alloc(0), policy: StagePolicy = { mode: Number(owned.mode & 0o777n), uid: Number(owned.uid), gid: Number(owned.gid) }, partial = false): void {
+  let current: SidecarSnapshot | undefined;
+  try { current = readSidecarSnapshot(path, contents.length); } catch { return; }
+  if (current === undefined || current.dev !== owned.dev || current.ino !== owned.ino || current.mode !== policy.mode || current.uid !== policy.uid || current.gid !== policy.gid) return;
+  const expected = partial ? contents.subarray(0, current.bytes.length) : contents;
+  if (current.bytes.equals(expected)) unlinkSync(path);
 }
 
 /** Prepared bytes with synchronous commit/disposal methods for a held SDK lease or exclusive lock. */
@@ -56,13 +62,15 @@ export async function prepareSidecarPublication(path: string, contents: string, 
   const mode = previous?.mode ?? Number(owned.mode & 0o600n);
   const uid = previous?.uid ?? Number(owned.uid);
   const gid = previous?.gid ?? Number(owned.gid);
+  const bytes = Buffer.from(contents);
+  const policy = { mode: Number(owned.mode & 0o777n), uid: Number(owned.uid), gid: Number(owned.gid) };
   try {
     await handle.writeFile(contents);
     await handle.sync();
     await handle.close();
   } catch (error) {
     await handle.close();
-    removeOwnedStage(stagePath, owned);
+    removeOwnedStage(stagePath, owned, bytes, policy, true);
     throw error;
   }
   return {
@@ -72,11 +80,12 @@ export async function prepareSidecarPublication(path: string, contents: string, 
       if (staged === undefined || staged.dev !== owned.dev || staged.ino !== owned.ino || staged.mode !== Number(owned.mode & 0o777n) || staged.uid !== Number(owned.uid) || staged.gid !== Number(owned.gid) || !staged.bytes.equals(Buffer.from(contents))) throw new SidecarConflict();
       const latest = readSidecarSnapshot(path, maxBytes);
       if (latest?.stamp !== previous?.stamp) throw new SidecarConflict();
-      if (BigInt(uid) !== owned.uid || BigInt(gid) !== owned.gid) chownSync(stagePath, uid, gid);
+      if (BigInt(uid) !== owned.uid || BigInt(gid) !== owned.gid) { chownSync(stagePath, uid, gid); policy.uid = uid; policy.gid = gid; }
       chmodSync(stagePath, mode);
+      policy.mode = mode;
       renameSync(stagePath, path);
     },
     /** Disposal cannot unlink a foreign replacement, including after a failed commit. */
-    dispose(): void { removeOwnedStage(stagePath, owned); },
+    dispose(): void { removeOwnedStage(stagePath, owned, bytes, policy); },
   };
 }
