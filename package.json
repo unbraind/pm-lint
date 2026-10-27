@@ -1,5 +1,5 @@
 {
-  "name": "pm-lint",
+  "name": "@unbrained/pm-lint",
   "version": "2026.10.13",
   "description": "Authoring-quality lint rules for useful pm item context",
   "repository": {
@@ -56,12 +56,12 @@
     "@babel/eslint-parser": "8.0.7",
     "@babel/plugin-syntax-typescript": "8.0.3",
     "@types/node": "26.6.5",
-    "@unbrained/pm-cli": "2026.10.20",
+    "@unbrained/pm-cli": "2026.10.23",
     "c8": "^12.0.0",
     "eslint": "10.13.0",
-    "jscpd": "5.4.1",
-    "pm-changelog": "2026.10.20",
-    "pm-ops": "2026.10.20",
+    "jscpd": "5.4.2",
+    "pm-changelog": "2026.10.23",
+    "pm-ops": "2026.10.23",
     "typescript": "7.0.2"
   },
   "keywords": [
@@ -97,7 +97,7 @@
       ],
       "links": {
         "docs": "https://github.com/unbraind/pm-lint#readme",
-        "npm": "https://www.npmjs.com/package/pm-lint",
+        "npm": "https://www.npmjs.com/package/@unbrained/pm-lint",
         "repository": "https://github.com/unbraind/pm-lint",
         "report": "https://github.com/unbraind/pm-lint/issues"
       }

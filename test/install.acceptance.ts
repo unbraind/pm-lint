@@ -123,7 +123,9 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   // npm 10 still runs prepare during pack; its source workspace must use the source tracker.
   const packOutput = command(root, 'npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch], join(root, '.agents/pm'), scratch);
   // npm 10 can prefix its final JSON array with prepare output.
-  const manifest = JSON.parse(packOutput.slice(packOutput.lastIndexOf('\n[') + 1)) as { filename: string; files: { path: string }[] }[];
+  const manifest = JSON.parse(packOutput.slice(packOutput.lastIndexOf('\n[') + 1)) as { name: string; filename: string; files: { path: string }[] }[];
+  assert.equal(manifest[0].name, '@unbrained/pm-lint');
+  assert.match(manifest[0].filename, /^unbrained-pm-lint-[0-9].*\.tgz$/);
   const files = manifest[0].files.map(file => file.path);
   assert.ok(files.includes('dist/index.js'));
   for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md'].includes(file), `unexpected packed file: ${file}`);
@@ -133,13 +135,18 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   for (const runtime of ['npm', 'bun']) {
     const cwd = join(scratch, runtime);
     await writeConsumer(cwd);
+    assert.equal((await readdir(cwd)).includes('.git'), false, 'consumer tracker is outside Git');
     const pmRoot = join(cwd, '.agents/pm');
     const args = runtime === 'npm' ? ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`] : ['add', '--ignore-scripts', tarball, `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`];
     command(cwd, runtime, args, pmRoot);
+    const installed = JSON.parse(await readFile(join(cwd, 'node_modules/@unbrained/pm-lint/package.json'), 'utf8')) as { name: string };
+    assert.equal(installed.name, '@unbrained/pm-lint');
     const runner = runtime === 'npm' ? 'npx' : 'bunx';
     const prefix = runtime === 'npm' ? ['--no-install', 'pm'] : ['--bun', '--no-install', 'pm'];
     command(cwd, runner, [...prefix, 'init', 'consumer', '--defaults', '--agent-guidance', 'skip', '--json'], pmRoot);
     command(cwd, runner, [...prefix, 'install', tarball, '--project', '--json'], pmRoot);
+    const activated = JSON.parse(await readFile(join(pmRoot, 'extensions/pm-lint/manifest.json'), 'utf8')) as { name: string };
+    assert.equal(activated.name, 'pm-lint');
     const help = command(cwd, runner, [...prefix, 'lint', '--help'], pmRoot).replace(/\s+/g, ' ');
     for (const text of ['Run only these rule codes', 'Skip these rule codes', 'Lint only these item ids', 'Lowest severity', 'SDK item type', 'comma-separated statuses', 'calendar date', 'Override the severity']) assert.ok(help.includes(text), `help describes ${text}`);
     // A deliberately weak item joins the certified corpus before the first verdict.
@@ -212,14 +219,14 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.ok(toon.stdout.length > 0, 'the default rendering is host TOON, not silence');
     assert.equal(toon.status, initial.verdict.exit_code ?? 0, 'TOON and JSON renderings share one exit contract');
     // The same shipped declarative pack runs through npm/npx and native Bun/bunx.
-    const portablePath = join(cwd, 'node_modules/pm-lint/examples/authoring-rules.json');
+    const portablePath = join(cwd, 'node_modules/@unbrained/pm-lint/examples/authoring-rules.json');
     const portable = jsonRead(cwd, runner, prefix, pmRoot, ['pack'], ['--pack', portablePath]);
     assert.equal(portable.status, 1);
     assert.ok(Number(portable.data.count) > 0);
     assert.ok((portable.data.findings as { rule: string }[]).every(row => row.rule.startsWith('ORG.')));
     const portableToon = runConsumer(cwd, runner, [...prefix, 'lint', 'pack', '--pack', portablePath], pmRoot);
     assert.match(portableToon.stdout, /ORG.acceptance/);
-    await writeFile(join(cwd, 'pack-sdk.mjs'), `import { lintRulePack, readRulePack, RulePackRefusal } from 'pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nconst pack = await readRulePack('node_modules/pm-lint/examples/authoring-rules.json');\nconst result = await lintRulePack(new PmClient({ pmRoot: '.agents/pm', noExtensions: true }), pack);\nif (result.count < 1 || result.exit_code !== 1 || typeof RulePackRefusal !== 'function') throw new Error('Packed rule SDK contract failed');\nconsole.log('packed-rule-sdk-ok');\n`);
+    await writeFile(join(cwd, 'pack-sdk.mjs'), `import { lintRulePack, readRulePack, RulePackRefusal } from '@unbrained/pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nconst pack = await readRulePack('node_modules/@unbrained/pm-lint/examples/authoring-rules.json');\nconst result = await lintRulePack(new PmClient({ pmRoot: '.agents/pm', noExtensions: true }), pack);\nif (result.count < 1 || result.exit_code !== 1 || typeof RulePackRefusal !== 'function') throw new Error('Packed rule SDK contract failed');\nconsole.log('packed-rule-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['pack-sdk.mjs'], pmRoot), /packed-rule-sdk-ok/);
     // The packed witness SDK and command retain exact citations in both runtimes.
     const proof = (await fixtureClient.create({ type: 'Task', title: 'Preserve packed witness citations', acceptanceCriteria: 'Output preserves the exact citation path' })).item;
@@ -237,7 +244,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     const witnessToon = runConsumer(cwd, runner, [...prefix, 'lint', 'witnesses', '--contract', witnessPath], pmRoot);
     assert.equal(witnessToon.status, 1);
     assert.match(witnessToon.stdout, /proof\.txt#L1/);
-    await writeFile(join(cwd, 'witness-sdk.mjs'), `import { lintWitnesses, parseWitnessContract, observationDigest, WitnessRefusal } from 'pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nimport { readFile } from 'node:fs/promises';\nconst contract = parseWitnessContract(JSON.parse(await readFile('witnesses.json', 'utf8')));\nconst result = await lintWitnesses(new PmClient({cwd: '.', pmRoot: '.agents/pm', noExtensions: true}), contract, '.');\nif (result.summary.supported !== 1 || observationDigest('a').length !== 64 || typeof WitnessRefusal !== 'function') throw new Error('Packed witness SDK contract failed');\nconsole.log('packed-witness-sdk-ok');\n`);
+    await writeFile(join(cwd, 'witness-sdk.mjs'), `import { lintWitnesses, parseWitnessContract, observationDigest, WitnessRefusal } from '@unbrained/pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nimport { readFile } from 'node:fs/promises';\nconst contract = parseWitnessContract(JSON.parse(await readFile('witnesses.json', 'utf8')));\nconst result = await lintWitnesses(new PmClient({cwd: '.', pmRoot: '.agents/pm', noExtensions: true}), contract, '.');\nif (result.summary.supported !== 1 || observationDigest('a').length !== 64 || typeof WitnessRefusal !== 'function') throw new Error('Packed witness SDK contract failed');\nconsole.log('packed-witness-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['witness-sdk.mjs'], pmRoot), /packed-witness-sdk-ok/);
     // Packed repair API and both renderers keep the single-target zero-write contract.
     const repair = jsonRead(cwd, runner, prefix, pmRoot, ['repair'], ['--id', created.id]);
@@ -246,7 +253,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.deepEqual(repair.data.patch, {});
     assert.equal(jsonRead(cwd, runner, prefix, pmRoot, ['repair'], ['--id', created.id, '--revision', String(repair.data.revision)]).status, 0);
     assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
-    await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from 'pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
+    await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }

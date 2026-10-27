@@ -931,7 +931,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pkg_name="pm-lint"
+          pkg_name="@unbrained/pm-lint"
           pkg_version="${NPM_VERSION}"
           mkdir -p "$RUNNER_TEMP/bun-verify"
           cd "$RUNNER_TEMP/bun-verify"
