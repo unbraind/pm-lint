@@ -111,7 +111,7 @@ export function parseRulePack(value: unknown): RulePack {
     const check = predicate(rule.predicate, `${path}.predicate`);
     if (rule.field === 'tags') {
       if (check.op !== 'required_tag' && check.op !== 'forbidden_tag') invalid(`${path}.predicate`);
-      check.value = toImportTags([check.value])[0];
+      check.value = text(toImportTags([check.value])[0], RULE_PACK_LIMITS.literal, `${path}.predicate`);
     } else if (rule.field === 'priority') {
       if (check.op !== 'min_value' && check.op !== 'max_value') invalid(`${path}.predicate`);
       if (check.value > RULE_PACK_LIMITS.priority) invalid(`${path}.predicate`);

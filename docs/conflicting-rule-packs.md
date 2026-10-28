@@ -30,6 +30,12 @@ Equal bounds are compatible. `present` and `max_length: 0` conflict; a title
 `max_length: 0` is impossible alone because native titles cannot be empty.
 All severities participate: advisory assertions can contradict one another too.
 
+The 512-unit literal ceiling applies to both the supplied and canonical UTF-16
+tag. Unicode lowercasing can expand text: 256 repetitions of U+0130 normalize
+to exactly 512 units and remain valid; 257 or 300 repetitions refuse with
+`limit_exceeded` before analysis or tracker access. File reads, repeated SDK
+parsing, policy evaluation and JSON/TOON commands use this same boundary.
+
 Each `when.statuses` and `when.types` list is an exact OR selector; dimensions
 are ANDed. A witness includes their nonempty intersection. Disjoint selectors
 cannot conflict. Status names are exact configured identities, with no lifecycle

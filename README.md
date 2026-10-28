@@ -361,6 +361,9 @@ selection, and 1,000 findings. Empty rule/selector arrays refuse. Exceeding a
 ceiling returns `limit_exceeded`; no partial result can pass. For SDK input the
 byte ceiling applies to the detached canonical pack; for files it also applies
 to the raw bytes, including whitespace. Regular files only are accepted.
+Literal ceilings count UTF-16 code units before and after SDK tag normalization;
+case mappings that expand a tag past 512 units return `limit_exceeded` on every
+SDK and CLI path. Accepted canonical packs remain valid when parsed again.
 
 Rows contain `item_id`, `rule`, `field`, `severity`, `explanation` and `remedy`.
 They sort by exact item id then rule id, independent of locale, declaration order

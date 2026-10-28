@@ -47,10 +47,10 @@ function consumerEnv(cwd: string, pmRoot: string, home = cwd): NodeJS.ProcessEnv
 }
 
 /** Execute a real consumer process and preserve diagnostics on unexpected exits. */
-function runConsumer(cwd: string, name: string, args: string[], pmRoot: string, home = cwd): { stdout: string; status: number | null } {
+function runConsumer(cwd: string, name: string, args: string[], pmRoot: string, home = cwd, expectedStatus?: number): { stdout: string; status: number | null } {
   const result = spawnSync(name, args, { cwd, encoding: 'utf8', env: consumerEnv(cwd, pmRoot, home), maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.error, undefined);
-  assert.ok(result.status === 0 || result.status === 1, `${name} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`);
+  assert.ok(expectedStatus === undefined ? result.status === 0 || result.status === 1 : result.status === expectedStatus, `${name} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`);
   return { stdout: result.stdout, status: result.status };
 }
 
@@ -289,9 +289,20 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
       const rendered = runConsumer(cwd, host, [...argv, 'lint', 'conflicts', '--pack', conflictPath], pmRoot);
       assert.equal(rendered.status, 1);
       assert.match(rendered.stdout, /rule_ids/);
+      // Canonical expansion must never change admission across installation modes or renderers.
+      const unicodePath = join(cwd, 'unicode-rules.json');
+      for (const repetitions of [256, 300]) {
+        await writeFile(unicodePath, JSON.stringify({ version: 1, rules: [{ id: 'Unicode', field: 'tags', predicate: { op: 'forbidden_tag', value: '\u0130'.repeat(repetitions) }, severity: 'error', explanation: 'Canonical Unicode boundary', remedy: 'Use a bounded canonical tag' }] }));
+        for (const command of ['conflicts', 'pack']) for (const format of [[], ['--json']]) {
+          const unicode = runConsumer(cwd, host, [...argv, 'lint', command, '--pack', unicodePath, ...format], pmRoot, cwd, repetitions === 256 ? 0 : 2);
+          if (repetitions === 300) assert.match(unicode.stdout, /limit_exceeded/);
+        }
+      }
     }
     await writeFile(join(cwd, 'conflict-sdk.mjs'), `import { analyzeRulePack, readRulePack } from '@unbrained/pm-lint';\nconst pack = await readRulePack('node_modules/@unbrained/pm-lint/examples/conflicting-rules.json');\nconst result = analyzeRulePack(pack);\nif (result.status !== 'conflict' || result.witness.rule_ids.length !== 2) throw new Error('Packed conflict SDK failed');\nconsole.log('packed-conflict-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['conflict-sdk.mjs'], pmRoot), /packed-conflict-sdk-ok/);
+    await writeFile(join(cwd, 'unicode-sdk.mjs'), `import assert from 'node:assert/strict';\nimport { writeFile } from 'node:fs/promises';\nimport { analyzeRulePack, lintRulePack, parseRulePack, readRulePack, RulePackRefusal } from '@unbrained/pm-lint';\nimport { PmClient } from '@unbrained/pm-cli/sdk';\nconst client = new PmClient({cwd: '.', pmRoot: '.agents/pm', noExtensions: true});\nfor (const op of ['required_tag', 'forbidden_tag']) for (const repetitions of [256, 300]) {\n  const input = {version: 1, rules: [{id: 'Unicode', field: 'tags', predicate: {op, value: '\\u0130'.repeat(repetitions)}, severity: 'error', explanation: 'Unicode boundary', remedy: 'Use a bounded tag'}]};\n  await writeFile('unicode-rules.json', JSON.stringify(input));\n  if (repetitions === 300) {\n    const refused = error => error instanceof RulePackRefusal && error.code === 'limit_exceeded';\n    assert.throws(() => analyzeRulePack(input), refused);\n    await assert.rejects(readRulePack('unicode-rules.json'), refused);\n    await assert.rejects(lintRulePack(client, input), refused);\n  } else {\n    const parsed = await readRulePack('unicode-rules.json');\n    assert.deepEqual(parseRulePack(parsed), parsed);\n    assert.deepEqual(analyzeRulePack(parsed), analyzeRulePack(input));\n    assert.deepEqual(await lintRulePack(client, parsed), await lintRulePack(client, input));\n  }\n}\nconsole.log('packed-unicode-closure-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['unicode-sdk.mjs'], pmRoot), /packed-unicode-closure-ok/);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });
