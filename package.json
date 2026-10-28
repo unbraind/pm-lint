@@ -24,7 +24,8 @@
     "docs/repair-preview-example.md",
     "docs/repair-preview-validation.md",
     "docs/incremental-example.md",
-    "docs/incremental-validation.md"
+    "docs/incremental-validation.md",
+    "docs/conflicting-rule-packs.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -111,13 +112,15 @@
       "docs/repair-preview-example.md",
       "docs/repair-preview-validation.md",
       "docs/incremental-example.md",
-      "docs/incremental-validation.md"
+      "docs/incremental-validation.md",
+      "docs/conflicting-rule-packs.md"
     ],
     "examples": [
       "README.md",
       "examples/authoring-rules.json",
       "docs/repair-preview-example.md",
-      "docs/incremental-example.md"
+      "docs/incremental-example.md",
+      "examples/conflicting-rules.json"
     ]
   },
   "publishConfig": {

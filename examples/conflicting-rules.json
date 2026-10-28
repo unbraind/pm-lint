@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "ORG.require-review",
+      "field": "tags",
+      "predicate": { "op": "required_tag", "value": "reviewed" },
+      "severity": "error",
+      "explanation": "Work must be reviewed.",
+      "remedy": "Add the reviewed tag."
+    },
+    {
+      "id": "ORG.forbid-review",
+      "field": "tags",
+      "predicate": { "op": "forbidden_tag", "value": "reviewed" },
+      "severity": "error",
+      "explanation": "This scope excludes reviewed work.",
+      "remedy": "Remove the reviewed tag or narrow the policy scope."
+    }
+  ]
+}

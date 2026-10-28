@@ -71,7 +71,7 @@ test('real non-git trackers evaluate every literal predicate, selectors and exac
   await client.create({ id: 'lint-pack-terminal', type: 'Task', title: 'Past work', status: 'closed', closeReason: 'Historical fixture' });
   const literalRules: AuthoringRule[] = [
     rule('present'), rule('contains', { op: 'contains', value: 'proof' }), rule('forbid', { op: 'not_contains', value: 'Exact' }),
-    rule('prefix', { op: 'starts_with', value: 'Exact' }), rule('minimum', { op: 'min_length', value: 6 }), rule('maximum', { op: 'max_length', value: 3 }),
+    rule('prefix', { op: 'starts_with', value: 'Exact' }), { ...rule('minimum', { op: 'min_length', value: 6 }), field: 'description' }, rule('maximum', { op: 'max_length', value: 3 }),
     { ...rule('literal', { op: 'contains', value: '(a+)+$' }), field: 'description', severity: 'info' },
     { ...rule('z'), severity: 'warn' }, { ...rule('a'), severity: 'warn' },
   ];

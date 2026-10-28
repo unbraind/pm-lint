@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Explain incompatible organization rules with minimal witnesses ([pm-lint-conflicting-rule-pack-witnesses](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/features/pm-lint-conflicting-rule-pack-witnesses.toon))
+
 ## 2026.10.28 - 2026-10-28
 
 ### Added

@@ -42,6 +42,7 @@ const RULE_CODES = ['PML001', 'PML002', 'PML003', 'PML004', 'PML005', 'PML006', 
 function consumerEnv(cwd: string, pmRoot: string, home = cwd): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, PM_PATH: pmRoot, PM_AUTHOR: 'install-test', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', NPM_CONFIG_USERCONFIG: '/dev/null', npm_config_userconfig: '/dev/null' };
   for (const key of Object.keys(env)) if (key.toLowerCase() === 'npm_config_allow_scripts') delete env[key];
+  for (const key of Object.keys(env)) if (/token|secret|password|credential|NPM_MEDIA_SERVER/i.test(key)) delete env[key];
   return env;
 }
 
@@ -128,7 +129,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
   assert.match(manifest[0].filename, /^unbrained-pm-lint-[0-9].*\.tgz$/);
   const files = manifest[0].files.map(file => file.path);
   assert.ok(files.includes('dist/index.js'));
-  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md', 'docs/incremental-example.md', 'docs/incremental-validation.md'].includes(file), `unexpected packed file: ${file}`);
+  for (const file of files) assert.ok(file.startsWith('dist/') || ['package.json', 'manifest.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples/authoring-rules.json', 'examples/conflicting-rules.json', 'docs/conflicting-rule-packs.md', 'docs/portable-rule-packs-validation.md', 'docs/repair-preview-example.md', 'docs/repair-preview-validation.md', 'docs/incremental-example.md', 'docs/incremental-validation.md'].includes(file), `unexpected packed file: ${file}`);
   assert.ok(files.includes('examples/authoring-rules.json'));
   const tarball = join(scratch, manifest[0].filename);
   const sdk = JSON.parse(await importManifest(root)) as { devDependencies: Record<string, string> };
@@ -279,6 +280,18 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     const globalRead = jsonRead(cwd, runtime === 'npm' ? process.execPath : 'bun', [join(globalRoot, 'bin', 'pm')], pmRoot, ['incremental'], ['--state', state]);
     assert.equal(globalRead.data.ok, true);
     assert.equal((await stat(state)).mode & 0o777, 0o600);
+    // The new pure analyzer shares one packed module through all supported acquisition modes.
+    const conflictPath = join(cwd, 'node_modules/@unbrained/pm-lint/examples/conflicting-rules.json');
+    for (const [host, argv] of [[runner, prefix], [runtime === 'npm' ? process.execPath : 'bun', [join(cwd, 'node_modules', '.bin', 'pm')]], [runtime === 'npm' ? process.execPath : 'bun', [join(globalRoot, 'bin', 'pm')]]] as const) {
+      const analysis = jsonRead(cwd, host, [...argv], pmRoot, ['conflicts'], ['--pack', conflictPath]);
+      assert.equal(analysis.status, 1);
+      assert.deepEqual((analysis.data.witness as { rule_ids: string[] }).rule_ids, ['ORG.forbid-review', 'ORG.require-review']);
+      const rendered = runConsumer(cwd, host, [...argv, 'lint', 'conflicts', '--pack', conflictPath], pmRoot);
+      assert.equal(rendered.status, 1);
+      assert.match(rendered.stdout, /rule_ids/);
+    }
+    await writeFile(join(cwd, 'conflict-sdk.mjs'), `import { analyzeRulePack, readRulePack } from '@unbrained/pm-lint';\nconst pack = await readRulePack('node_modules/@unbrained/pm-lint/examples/conflicting-rules.json');\nconst result = analyzeRulePack(pack);\nif (result.status !== 'conflict' || result.witness.rule_ids.length !== 2) throw new Error('Packed conflict SDK failed');\nconsole.log('packed-conflict-sdk-ok');\n`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['conflict-sdk.mjs'], pmRoot), /packed-conflict-sdk-ok/);
     assert.ok((await readdir(cwd)).includes('node_modules'));
   }
 });
