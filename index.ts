@@ -54,7 +54,7 @@ export type { RuleListing, RulesResult } from './src/commands.ts';
 
 /** Activate read-only item linting through the host command registry. */
 export default defineExtension({
-  name: 'pm-lint', version: '2026.10.13', description: 'Authoring-quality rules for useful pm context',
+  name: 'pm-lint', version: "2026.10.28", description: 'Authoring-quality rules for useful pm context',
   /** Register one observational command; the package never mutates items. */
   activate(api: ExtensionApi): void { registerLintCommand(api); registerWitnessCommand(api); registerRulePackCommand(api); registerRepairCommand(api); registerIncrementalCommand(api); },
 });
