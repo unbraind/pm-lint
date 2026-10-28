@@ -1,4 +1,4 @@
-import { parseRulePack } from './rule-pack-contract.ts';
+import { parseRulePack, RULE_PACK_LIMITS } from './rule-pack-contract.ts';
 import type { AuthoringRule, RulePack } from './rule-pack-contract.ts';
 
 /** Smallest contradictory conjunction, valid in the displayed selector intersection. */
@@ -42,7 +42,7 @@ function intersection(a: AuthoringRule, b: AuthoringRule): RulePackConflict['whe
 
 /** Map the admitted integer interval grammar without approximate arithmetic. */
 function interval(rule: AuthoringRule): readonly [number, number] {
-  const domain = rule.field === 'priority' ? 4 : 65536;
+  const domain = rule.field === 'priority' ? RULE_PACK_LIMITS.priority : RULE_PACK_LIMITS.text;
   const check = rule.predicate as { op: 'present' } | { op: 'min_length' | 'min_value' | 'max_length' | 'max_value'; value: number };
   if (check.op === 'present') return [1, domain];
   return check.op === 'min_length' || check.op === 'min_value' ? [check.value, domain] : [0, check.value];

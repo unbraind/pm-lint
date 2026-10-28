@@ -39,7 +39,7 @@ export class RulePackRefusal extends Error {
   }
 }
 /** Hard ceilings apply to SDK input, file reads and evaluation; no silent truncation. */
-export const RULE_PACK_LIMITS = { bytes: 65536, rules: 64, literal: 512, text: 65536, checks: 100000, findings: 1000 } as const;
+export const RULE_PACK_LIMITS = { bytes: 65536, rules: 64, literal: 512, text: 65536, priority: 4, checks: 100000, findings: 1000 } as const;
 
 /** Reject malformed values at a contract coordinate without disclosing their contents. */
 function invalid(path: string): never {
@@ -114,7 +114,7 @@ export function parseRulePack(value: unknown): RulePack {
       check.value = toImportTags([check.value])[0];
     } else if (rule.field === 'priority') {
       if (check.op !== 'min_value' && check.op !== 'max_value') invalid(`${path}.predicate`);
-      if (check.value > 4) invalid(`${path}.predicate`);
+      if (check.value > RULE_PACK_LIMITS.priority) invalid(`${path}.predicate`);
     } else if (check.op === 'required_tag' || check.op === 'forbidden_tag' || check.op === 'min_value' || check.op === 'max_value') invalid(`${path}.predicate`);
     return { id, field: rule.field as AuthoringRule['field'], predicate: check, severity: rule.severity as Severity, explanation: text(rule.explanation, 256, `${path}.explanation`), remedy: text(rule.remedy, 256, `${path}.remedy`), ...(Object.hasOwn(rule, 'when') ? { when: selectors(rule.when, `${path}.when`) } : {}) };
   });

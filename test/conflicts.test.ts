@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { encode, decode } from '@toon-format/toon';
 import { activateExtensionForTest, assertRegisteredCommandContract } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
 import extension, { analyzeRulePack, lintRulePack, parseRulePack, RulePackRefusal } from '../index.ts';
@@ -64,6 +65,33 @@ test('shared boundary refuses sparse arrays, invalid field/operator pairs and ex
 
 /** Preserve a previously released version 1 serialization, including whitespace literals. */
 function awaitlessExample(): string { return '{"version":1,"rules":[{"id":"ORG.legacy","field":"title","predicate":{"op":"contains","value":" x "},"severity":"warn","explanation":"Existing rule","remedy":"Keep literal whitespace"}]}'; }
+
+test('500 seeded extreme-input fuzz cases emit bounded finite receipts or typed refusals and preserve producer round trips', () => {
+  let seed = 0xe87e2026;
+  const values = [NaN, Infinity, -Infinity, Number.MAX_VALUE, -Number.MAX_VALUE, Number.MIN_VALUE, -1, 0, 1, 4, 5, 65536, 65537, 0.5];
+  let emitted = 0;
+  let refused = 0;
+  for (let sequence = 0; sequence < 500; sequence++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const value = values[seed % values.length];
+    const field = seed % 3 === 0 ? 'priority' : 'description';
+    const input = policy(constraint(sequence % 2 === 0 ? 'constructor' : 'r', field, { op: field === 'priority' ? 'min_value' : 'min_length', value }));
+    try {
+      const result = analyzeRulePack(input);
+      emitted++;
+      assert.equal(result.status, 'compatible');
+      assert.equal(result.rule_count, 1);
+      assert.ok(Number.isFinite(result.rule_count) && Number.isFinite(result.version));
+      assert.deepEqual(decode(encode(result)), JSON.parse(JSON.stringify(result)));
+      assert.deepEqual(parseRulePack(decode(encode(parseRulePack(input)))), parseRulePack(input));
+    } catch (error) {
+      assert.ok(error instanceof RulePackRefusal, `seed=0xe87e2026 sequence=${sequence}`);
+      assert.ok(error.code === 'invalid_pack' || error.code === 'limit_exceeded');
+      refused++;
+    }
+  }
+  assert.ok(emitted > 50 && refused > 50, 'the seed exercises both boundary outcomes');
+});
 
 test('policy preflight rejects contradictions before a complete corpus read and preserves SDK state', async t => {
   const { client, pmRoot } = await tracker(t);
