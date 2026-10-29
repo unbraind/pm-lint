@@ -1,0 +1,12 @@
+id: pm-lint-managed-extension-health-skew
+title: Investigate managed extension version-skew health diagnostics
+description: A local health check reported extension_host_pm_cli_version_skew for the managed GitHub extension while fresh CI tracker-health checks passed on both Node matrix jobs. Keep this operational diagnostic separate from rule-pack satisfiability; no dependency pins or health thresholds were changed.
+type: Chore
+status: open
+priority: 3
+tags[2]: follow-up,health
+created_at: "2026-10-28T23:17:21.782Z"
+updated_at: "2026-10-28T23:17:21.782Z"
+author: codex-agent
+acceptance_criteria: Reproduce the skew diagnostic with supported lifecycle operations in a disposable tracker; identify whether metadata refresh or installation is required; document a concrete remedy without weakening health gates or mutating unrelated extensions.
+body: ""

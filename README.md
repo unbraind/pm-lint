@@ -342,7 +342,7 @@ at every level, including predicates and selectors; unknown versions fail closed
 
 | Property | Version 1 semantics |
 | --- | --- |
-| `field` | `title`, `description`, `acceptance_criteria`, `definition_of_ready`, `resolution`, `blocked_reason`, `outcome`, `value`, `why_now` |
+| `field` | `tags`, `priority`, `title`, `description`, `acceptance_criteria`, `definition_of_ready`, `resolution`, `blocked_reason`, `outcome`, `value`, `why_now` |
 | `predicate` | `{ "op": "present" }`, or `{ "op": "contains" / "not_contains" / "starts_with", "value": "literal" }`, or `{ "op": "min_length" / "max_length", "value": integer }` |
 | `severity` | `info`, `warn`, `error`; only failed `error` assertions fail the gate |
 | `explanation`, `remedy` | Required nonblank organization-authored diagnostic text, at most 256 characters each |
@@ -361,6 +361,9 @@ selection, and 1,000 findings. Empty rule/selector arrays refuse. Exceeding a
 ceiling returns `limit_exceeded`; no partial result can pass. For SDK input the
 byte ceiling applies to the detached canonical pack; for files it also applies
 to the raw bytes, including whitespace. Regular files only are accepted.
+Literal ceilings count UTF-16 code units before and after SDK tag normalization;
+case mappings that expand a tag past 512 units return `limit_exceeded` on every
+SDK and CLI path. Accepted canonical packs remain valid when parsed again.
 
 Rows contain `item_id`, `rule`, `field`, `severity`, `explanation` and `remedy`.
 They sort by exact item id then rule id, independent of locale, declaration order
@@ -368,7 +371,7 @@ and storage order. Receipts include corpus/check/finding counts, severity counts
 and core's complete-list certificate. Item titles and text are not copied into
 rows. Host output budgets and continuation controls apply to `findings` in TOON
 and JSON. Exit codes are 0 for no error findings, 1 for error findings, and 2 for
-typed pack refusals (`invalid_pack`, `unsafe_pattern`, `limit_exceeded`, `pack_io`).
+typed pack refusals (`invalid_pack`, `unsafe_pattern`, `limit_exceeded`, `pack_io`, `conflicting_pack`).
 Core read/certification failures retain core's diagnostic instead of becoming a
 successful or partial pack result. Baseline acknowledgments do not suppress pack
 rules; they belong to the separate built-in lint command.
@@ -394,6 +397,20 @@ the same certified canonical metadata without filesystem access in the evaluator
 Tests compare real TOON and legacy JSON Markdown reader results; the pinned host
 migrates legacy Markdown during reading. These tests do not attest hosted database
 or network deployment. Pack semantics never inspect storage paths or invoke git.
+
+## Conflicting rule-pack witnesses
+
+Run `pm lint conflicts --pack examples/conflicting-rules.json` (or add `--json`)
+before applying an organization policy. The typed `analyzeRulePack` SDK returns
+the smallest conflicting rule-ID set for required/forbidden tags, inclusive
+native priority ranges and text-length bounds. Rule ordering never changes
+identities or witness selection. Selectors must overlap for rules to conflict.
+
+Literal text predicates outside the proof fragment return `unknown` with rule
+IDs and a remedy. Proven contradictions stop `pm lint pack` before its tracker
+read. See the [grammar, example and exit contracts](docs/conflicting-rule-packs.md)
+and the shipped [conflicting pack](examples/conflicting-rules.json). These
+observational commands also work in plain directory trackers without git.
 
 ## Without git
 

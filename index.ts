@@ -26,6 +26,9 @@ export type { RepairRequest, RepairPatch, RepairPreview, RepairQuestion, RepairR
 export { lintRulePack, parseRulePack, readRulePack, RulePackRefusal, RULE_PACK_FIELDS, RULE_PACK_LIMITS } from './src/rule-pack.ts';
 /** Expose the versioned semantic contract and compact diagnostic receipt. */
 export type { AuthoringPredicate, AuthoringRule, RulePack, RulePackFinding, RulePackResult, RulePackRefusalCode } from './src/rule-pack.ts';
+/** Expose conservative minimum-cardinality policy proofs without tracker access. */
+export { analyzeRulePack } from './src/rule-pack-conflicts.ts';
+export type { RulePackConflict, RulePackAnalysis } from './src/rule-pack-conflicts.ts';
 
 /** Expose portable acceptance witness validation and strict contract parsing. */
 export { lintWitnesses, parseWitnessContract, readWitnessContract, observationDigest, WitnessRefusal } from './src/witnesses.ts';
