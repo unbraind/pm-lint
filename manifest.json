@@ -1,6 +1,6 @@
 {
   "name": "pm-lint",
-  "version": "2026.10.28",
+  "version": "2026.10.29",
   "description": "Authoring-quality lint rules for useful pm item context",
   "author": "@unbraind",
   "entry": "./dist/index.js",
