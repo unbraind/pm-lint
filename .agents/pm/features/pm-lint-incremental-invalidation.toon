@@ -2,14 +2,20 @@ id: pm-lint-incremental-invalidation
 title: Preserve complete lint results with incremental rule invalidation
 description: "Retain rule dependency metadata and SDK event cursors to update a complete lint result after unrelated edits. Overlap recheck: existing lint --since filters items by updated_at and drops other findings; lint baselines acknowledge findings without skipping evaluation; portable rule packs and repair previews do not maintain an incremental result. Core listMutationEvents supplies pagination and listAllComplete/certifyCompleteListResult supplies complete corpus certification. Sibling pm-observer cursors track evidence ingestion and pm-graph refreshes graph projections; neither owns lint rule/item dependency invalidation."
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-27T08:23:52.579Z"
-updated_at: "2026-10-27T12:27:44.404Z"
+updated_at: "2026-10-30T18:05:35.342Z"
+closed_at: "2026-10-30T18:05:32.535Z"
+completed_at: "2026-10-27T20:49:54.000Z"
 author: codex-agent
 acceptance_criteria: "One title edit in 10000 items reruns only affected rules plus declared global checks; the complete result equals a fresh full scan; cursor loss or rule-version drift forces an explicit rebuild; typed SDK and CLI, compact TOON/JSON, typed refusals, README and example, public non-git tracker validation, seeded state properties and interleaving coverage, npm and Bun CI release gates."
 parent: pm-lint-epic
+release: 2026.10.28
+resolution: "Delivered by PR #32 (697a2fe): Keep complete lint findings while rechecking only affected rules"
+expected_result: "One title edit in 10000 items reruns only affected rules plus declared global checks; the complete result equals a fresh full scan; cursor loss or rule-version drift forces an explicit rebuild; typed SDK and CLI, compact TOON/JSON, typed refusals, README and example, public non-git tracker validation, seeded state properties and interleaving coverage, npm and Bun CI release gates."
+actual_result: "PR #32 merged at 2026-10-27T20:49:54Z as 697a2fe; required CI passed on the merged head."
 comments[15]{created_at,author,text}:
   "2026-10-27T08:31:39.266Z",codex-agent,"Implemented an SDK-injected incremental engine and a fenced file adapter. Checkpoints keep native-source digests, declared per-rule input digests, violation bits and an SDK cursor anchor; findings are freshly rendered from a certified full read. Global checks are clock, hierarchy, blocker references and SDK duplicates. Core leases serialize checkpoint reads and publication; every source revision and policy is read back through the SDK before publishing. No item mutations or journaled item plans are introduced. Registry version lookup reports 2026.10.27; the repository SDK pin remains 2026.10.23 as required."
   "2026-10-27T08:55:08.856Z",codex-agent,"Read-only public origin/main tracker validation: 21 items, zero findings, source digest 16b7a56ee139b2681ce3ece7e468d9caea102b1cd32a38f9aee4ee638ffaa7d1; authoritative names and bytes preserved. No-op: 12 global predicates, 54 reused pairs. One title edit on a separate disposable derivative: 15 evaluated, 51 reused; result equals fresh full scan. Observed milliseconds: rebuild 3650, no-op 694, edit 288, fresh full 98; incremental reduces predicate work, not every wall-time cost. Seed 0x1ace2026 passed 500 native-state/checkpoint sequences and the second property passed 500 random custom registries. Schema, fenced publication, real 1000-event pagination and all interleaving tests pass. Rule version advances to 2 for lifecycle-role semantics; old baseline documents remain readable and stale acknowledgments are explicit."
@@ -50,4 +56,5 @@ docs[3]{path,scope}:
   docs/incremental-example.md,project
   docs/incremental-validation.md,project
   README.md,project
+close_reason: "Delivered by PR #32 (697a2fe): Keep complete lint findings while rechecking only affected rules"
 body: ""

@@ -2,14 +2,20 @@ id: pm-lint-conflicting-rule-pack-witnesses
 title: Explain incompatible organization rules with minimal witnesses
 description: "Re-run core and sibling overlap inspection, then add declarative conflict preflight with compact agent receipts, remedies and no tracker mutation."
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-28T22:59:05.444Z"
-updated_at: "2026-10-28T23:42:19.873Z"
+updated_at: "2026-10-30T18:05:28.810Z"
+closed_at: "2026-10-30T18:05:26.847Z"
+completed_at: "2026-10-29T00:09:29.000Z"
 author: codex-agent
 acceptance_criteria: Required/forbidden same-tag and impossible numeric-range fixtures return globally smallest witnesses; unsupported predicates yield unknown rather than an invented proof; identical packs preserve identical rule IDs; typed SDK and CLI share one bounded grammar and preflight; real public tracker validation preserves all source bytes.
 parent: pm-lint-epic
+release: 2026.10.29
+resolution: "Delivered by PR #42 (ac54296): Explain conflicting organization rules before policy evaluation"
+expected_result: Required/forbidden same-tag and impossible numeric-range fixtures return globally smallest witnesses; unsupported predicates yield unknown rather than an invented proof; identical packs preserve identical rule IDs; typed SDK and CLI share one bounded grammar and preflight; real public tracker validation preserves all source bytes.
+actual_result: "PR #42 merged at 2026-10-29T00:09:29Z as ac54296; required CI passed on the merged head."
 comments[9]{created_at,author,text}:
   "2026-10-28T22:59:13.013Z",codex-agent,"Overlap rechecked: core SDK schema declarations validate field contracts and certified corpus reads; pm-presets validate checks preset structure; pm-review conflict handling concerns review dispositions and imported identities. None exposes rule-pack satisfiability. Existing src/rule-pack.ts independently evaluates text assertions. Add a shared strict schema for compatible text, tag membership and numeric bounds; exact pairwise proofs for the supported fragment, explicit unknown for unsupported text combinations. Analysis and policy evaluation share the parser and preflight. The feature is observational: no imports, mutations, plans, checkpoints, claims or concurrent state in the product path."
   "2026-10-28T23:06:57.597Z",codex-agent,"Implemented shared strict pack contract, exact tag/priority/text-bound preflight and lint conflicts command. Unknown literal text proof operations remain explicit unknown; unsafe or malformed grammar remains a typed refusal. Pure analysis performs no SDK reads; policy application rejects proven conflicts before reading. 500 seeded operation sequences passed against an independent exhaustive finite-domain oracle and SDK-read native state, including old inputs, JSON/TOON, Markdown, CRLF, relationships and ambient focus. Real read-only public snapshot at source 57a49b5: 23 items, 3 rules, 69 checks, 24 findings (23 required-tag, 1 lower-priority, 0 upper-priority); both witnesses size 2, receipt 334 JSON / 313 TOON bytes. Rule reorder equality and full byte inventory unchanged. SDK observation: the pinned host first complete read writes metadata cache files on writable trackers; the immutable copy remained unchanged."
@@ -36,4 +42,5 @@ docs[3]{path,scope}:
   docs/conflicting-rule-packs.md,project
   examples/conflicting-rules.json,project
   README.md,project
+close_reason: "Delivered by PR #42 (ac54296): Explain conflicting organization rules before policy evaluation"
 body: ""
