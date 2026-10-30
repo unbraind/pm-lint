@@ -2,13 +2,19 @@ id: pm-lint-scoped-npm-name
 title: Publish pm-lint as @unbrained/pm-lint
 description: "npm rejected the unscoped name as too similar to publint. Publish metadata, install instructions and packed consumer checks must use @unbrained/pm-lint while extension identity and commands stay pm-lint."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-26T10:48:51.376Z"
-updated_at: "2026-10-26T11:03:16.051Z"
+updated_at: "2026-10-30T18:05:40.357Z"
+closed_at: "2026-10-30T18:05:38.538Z"
+completed_at: "2026-10-26T12:03:22.000Z"
 author: codex-agent
 acceptance_criteria: Scoped package metadata and public homepage agree; npm and Bun packed installs activate pm-lint in non-git trackers and run real lint commands; both release gates pass and a ready PR records evidence.
+release: 2026.10.28
+resolution: "Delivered by PR #29 (d7be594): Publish the package to npm as @unbrained/pm-lint"
+expected_result: Scoped package metadata and public homepage agree; npm and Bun packed installs activate pm-lint in non-git trackers and run real lint commands; both release gates pass and a ready PR records evidence.
+actual_result: "PR #29 merged at 2026-10-26T12:03:22Z as d7be594; required CI passed on the merged head."
 comments[6]{created_at,author,text}:
   "2026-10-26T10:48:54.786Z",codex-agent,"Plan: rename only the npm coordinate and SDK imports, preserve manifest name pm-lint, command names and catalog display_name. Keep publishConfig.access public and use the catalog homepage. Branch starts from main independently of open PR #26; overlap is package metadata, README and release workflow. Verify scoped source resolution and tarball activation in fresh non-git trackers, npm and Bun installs, targeted regressions and both full release gates. Do not publish or merge."
   "2026-10-26T10:50:39.128Z",codex-agent,"Pinned host inspection: registry packages require an explicit npm: prefix, so document pm install npm:@unbrained/pm-lint; bare pm install @unbrained/pm-lint resolves as a local source. This extension has no bin; npx/bunx must invoke the pm host. Updated all current SDK imports and scoped node_modules paths. Regression proof: independently restoring origin/main package.json or the release workflow makes the corresponding package-metadata test fail (1 failure each); restored files pass 2/2. Typecheck and lint pass."
@@ -30,4 +36,5 @@ docs[5]{path,scope,note}:
   docs/scoped-npm-validation.md,project,Exact packed install commands and observed outputs
   docs/witness-example.md,project,Scoped SDK imports
   README.md,project,Scoped installation and unchanged extension identity
+close_reason: "Delivered by PR #29 (d7be594): Publish the package to npm as @unbrained/pm-lint"
 body: ""
