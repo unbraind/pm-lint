@@ -347,6 +347,8 @@ describe('PML005 stale in-progress work and claims', () => {
     const check = ruleFor('PML005').check;
     const claimedMeta = await oneItem(client, claimed.item.id);
     const terminalMeta = await oneItem(client, terminal.item.id);
+    assert.equal(terminalMeta.assignee, undefined);
+    assert.equal(terminalMeta.claim_principal, undefined);
     const canceledMeta = await oneItem(client, canceled.item.id);
     const freshMeta = await oneItem(client, freshOpen.item.id);
     const base = Date.now();
@@ -357,7 +359,7 @@ describe('PML005 stale in-progress work and claims', () => {
     );
     assert.equal(
       check(adjust(terminalMeta, { updated_at: iso(base - 20 * MS_PER_DAY) }), lintContext([terminalMeta], { now: base })),
-      true,
+      false,
     );
     assert.equal(
       check(adjust(canceledMeta, { updated_at: iso(base - 20 * MS_PER_DAY) }), lintContext([canceledMeta], { now: base })),

@@ -41,3 +41,13 @@ pm lint repair --id pm-example-abcd --revision <observed-sha256> --json
 A preview is an observation of a source snapshot. Concurrent writers may edit
 after it returns. Apply-time mutation preconditions remain the caller's
 responsibility; a plan key is not a lock or an executable transaction id.
+
+Before host output projection, the SDK receipt is JSON-compatible for both
+JSON and TOON encoders: optional properties with `undefined` values are omitted,
+while all defined
+native staged records and metadata are retained. `revision` and `plan_key`
+identify the observed source and proposed plan. `validation` is freshly staged
+evidence on every call, so its timestamps may differ for the same plan. The
+SDK's `records[].commit_time_fields` JSON pointers identify clock values that
+commit may regenerate; compare those as fresh evidence rather than replay
+identity. Reusing a plan key never reuses a validation result.
