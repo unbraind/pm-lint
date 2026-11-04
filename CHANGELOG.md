@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- SDK 2026.10.30 upgrade breaks repair-preview transport and replay equality ([pm-lint-github-253a36d6af64-57](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-github-253a36d6af64-57.toon))
+
+## 2026.11.4 - 2026-11-04
+
+No changes.
+
+## 2026.11.3 - 2026-11-03
+
+No changes.
+
+## 2026.10.31 - 2026-10-31
+
+No changes.
+
 ## 2026.10.29 - 2026-10-29
 
 ### Added
