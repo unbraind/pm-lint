@@ -63,6 +63,7 @@ export interface RepairPreview {
   findings: MechanicalFinding[];
   patch: RepairPatch;
   questions: RepairQuestion[];
+  /** Fresh JSON-compatible staged evidence; SDK-declared commit clocks are not replay identity. */
   validation: ItemMutationPreviewValidation | null;
   remaining_mechanical: number;
   /** Foreign operational state is excluded without reading, replaying or deleting it. */
@@ -167,7 +168,9 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
       const plan = await planItemMutationDocument({ pmRoot, transactionId: `lint-repair-${planKey}`, input: JSON.stringify([{ op: 'update', id: item.id, options: { ...patch, ...(patch.tags === undefined ? {} : { tags: JSON.stringify(patch.tags) }) } }]) });
       await options.onBoundary?.('planned');
       // A fresh disposable validation identity avoids replaying a source journal, including foreign records.
-      validation = await previewItemMutations({ pmRoot, author: 'lint-preview', transactionId: `lint-preview-${randomUUID()}`, mutations: plan.mutations });
+      const staged = await previewItemMutations({ pmRoot, author: 'lint-preview', transactionId: `lint-preview-${randomUUID()}`, mutations: plan.mutations });
+      // Native optional properties must have the same absence semantics on SDK, JSON and TOON surfaces.
+      validation = JSON.parse(JSON.stringify(staged)) as ItemMutationPreviewValidation;
     } catch {
       throw new RepairRefusal('unsafe_repair', 'Core could not freshly validate the proposed repair.', 'Run pm validate and inspect ownership/schema constraints; refresh the preview after resolving them.');
     }

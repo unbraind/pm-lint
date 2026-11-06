@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -65,7 +66,7 @@ test('500 seeded random sequences preserve SDK-read state across document/output
     if (requests.length > 0) {
       const older = requests[Math.floor(rng() * requests.length)];
       if (older.revision !== receipt.revision) await assert.rejects(previewAuthoringRepairs(pmRoot, older), error => error instanceof RepairRefusal && error.code === 'stale_revision');
-      else assert.deepEqual(await previewAuthoringRepairs(pmRoot, older), receipt);
+      else assertRepairReplay(await previewAuthoringRepairs(pmRoot, older), receipt);
     }
     requests.push({ id: item.id, revision: receipt.revision });
     assert.deepEqual(await nativeState(client, item.id), model, `state sequence=${sequence}`);

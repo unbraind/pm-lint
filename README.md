@@ -54,9 +54,9 @@ npm pack
 In a fresh directory outside any Git repository, install the host and initialize a tracker, then install the packed artifact (copy it into that directory first):
 
 ```sh
-npm install @unbrained/pm-cli@2026.10.23
+npm install @unbrained/pm-cli@2026.11.4
 npx pm init lint-consumer --defaults --agent-guidance skip
-npx pm install ./unbrained-pm-lint-2026.10.13.tgz
+npx pm install ./*.tgz
 npx pm lint --json
 ```
 
@@ -462,3 +462,8 @@ The approval variable controls GitHub releases; it does not impose a local npm
 publishing hold. Maintainers run the prepublish checks and authenticate with npm
 for local publication. The first local publish uses `--provenance=false`; daily
 GitHub OIDC releases keep provenance enabled.
+
+Changelog generation explicitly includes empty daily release windows. When a
+daily version tag has no qualifying tracker changes, its section says
+“No changes.” Current in-progress fixes remain under Unreleased until their
+release window is selected.
