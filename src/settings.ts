@@ -1,4 +1,4 @@
-import { getSettingsPath, readFileIfExists, readSettings } from '@unbrained/pm-cli/sdk';
+import { readSettingsSection } from '@unbrained/pm-cli/sdk';
 import { RULES } from './rules.ts';
 import type { LintConfig, RuleCode, RuleConfig, RuleScope, Severity } from './types.ts';
 import type { LintBaseline } from './baseline.ts';
@@ -50,19 +50,13 @@ function codeList(value: unknown): RuleCode[] {
   return value.map(/** Validate each code independently. */ entry => ruleCode(entry));
 }
 
-/** Read extension settings with the public SDK, preserving its currently stripped custom section. */
+/** Read lint policy through the SDK, retaining package validation as typed section refusals. */
 export async function readLintSettings(pmRoot: string): Promise<unknown> {
-  await readSettings(pmRoot);
-  // SDK readSettings validates core settings but strips extension-owned keys.
-  const text = await readFileIfExists(getSettingsPath(pmRoot));
-  return lintSettingsFromText(text);
-}
-
-/** Parse SDK settings bytes and reject a settings file lost during a concurrent read. */
-export function lintSettingsFromText(text: string | null): unknown {
-  if (text === null) throw new Error('Tracker settings disappeared during lint read');
-  const raw: unknown = JSON.parse(text);
-  return objectValue(raw).lint;
+  const section = await readSettingsSection(pmRoot, 'lint', {
+    /** Core owns storage and refusal types; pm-lint owns rule policy and precedence. */
+    validate(raw) { resolveConfig(raw); return raw; },
+  });
+  return section.value;
 }
 
 /** Validate parameters supported by each rule, rejecting typos and unsafe numeric windows. */

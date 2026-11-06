@@ -1,0 +1,28 @@
+id: pm-lint-sdk-settings-sections
+title: Adopt SDK lint settings section reads
+description: Replace private settings reopening and parsing with the public SDK section reader while retaining lint policy validation.
+type: Chore
+status: in_progress
+priority: 1
+tags[2]: sdk-adoption,settings
+created_at: "2026-11-06T15:45:20.572Z"
+updated_at: "2026-11-06T15:54:27.859Z"
+author: codex-sol
+acceptance_criteria: "Direct and registered command reads agree on policy; Malformed documents and sections produce typed SDK refusals; Absent policy, custom core schema and sibling sections remain compatible; Behavioral revert proofs and package gates pass"
+comments[4]{created_at,author,text}:
+  "2026-11-06T15:45:26.020Z",codex-sol,"Scope: pm-lint only, companion pm-cli-website-m8dy (G4), audit pm-cli-website-7zcy. Replace the private readSettings plus raw-file parser with readSettingsSection and its validator callback. Keep lint rule vocabulary, numeric windows and CLI precedence because these are package policy. Test real non-git trackers and registered commands through createExtensionTestHarness; record behavioral revert proofs. SDK 2026.11.4 already exports the needed API; dependency pins stay unchanged."
+  "2026-11-06T15:49:10.888Z",codex-sol,"Implementation: removed lintSettingsFromText and private readSettings/raw-file recovery. readSettingsSection validates stored lint policy with resolveConfig; repairs reuse readLintSettings while retaining raw bytes only for snapshot digest and schema fencing. SDK section APIs shipped in 2026.11.2, so peer/manifest minimums move there while the 2026.11.4 dev pin stays unchanged. Targeted build plus settings/repair tests passed 16/16. Revert proofs in a disposable package copy: reverting only readLintSettings makes the policy test fail with Missing expected rejection and malformed-document test fail on untyped SyntaxError (each 0/1); restoring that reader and reverting only repair policy parsing makes the policy test fail on untyped Expected a lint settings object (0/1). The fixed targeted suite is rerunning via linked pm tests."
+  "2026-11-06T15:53:01.395Z",codex-sol,"Linked pm test rerun passed 16/16 after the disposable revert checks. npm run typecheck, npm run lint, npm run duplication (0 percent), and npm run docstring passed. Confirmed readSettingsSection in the public 2026.11.2 package declarations. Full npm gate is running, with Bun and isolated-HOME verification to follow serially. The PR will use branch lint-sdk-settings-sections; CI and bot review are required before orchestrator verification. No SDK gaps encountered. Item remains in_progress; releasing the implementation claim for handoff."
+  "2026-11-06T15:54:27.857Z",codex-sol,"Local strict tracker health reports only extension_host_pm_cli_version_skew:2026.11.4:2026.11.5:pm-github; history_drift, integrity, settings and storage checks pass. This is already tracked by pm-lint-managed-extension-health-skew, whose prior evidence distinguishes local managed-extension state from clean CI. No dependency bump or extension mutation is in scope; preserve the diagnostic and verify fresh CI."
+files[6]{path,scope}:
+  manifest.json,project
+  package-lock.json,project
+  package.json,project
+  src/repairs.ts,project
+  src/settings.ts,project
+  test/settings.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test --test-concurrency=2 test/settings.test.ts test/repairs.test.ts,project,codex-sol,"2026-11-06T15:47:55.771Z",local_mutation,lint-sdk-settings-sections
+docs[1]{path,scope}:
+  README.md,project
+body: ""

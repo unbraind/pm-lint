@@ -4,7 +4,7 @@ Project management = context management. Vague work items waste agent time becau
 
 The npm package is `@unbrained/pm-lint`. The pm extension identity, catalog display name and command names remain `pm-lint`: existing `pm lint` commands do not change. The public package homepage remains <https://pm-cli.unbrained.dev/packages/pm-lint>.
 
-This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.10.23`; Node `>=22.18.0`.
+This package is unreleased and under local review. Registry commands become available after maintainer-approved publication. Minimum host SDK: `2026.11.2`; Node `>=22.18.0`.
 
 With a pm host already installed, activate the registry package in your tracker:
 
@@ -303,7 +303,7 @@ Place a `lint` section in the tracker's `settings.json`:
 }
 ```
 
-All rules start enabled. Settings apply enable/disable lists, then per-rule entries, then CLI overrides. Supported severities are `error`, `warn`, and `info`. Supported scopes are `all`, `non_terminal`, `active`, `terminal`, `closed`, `canceled`, `open`, `in_progress`, and `blocked`. Lifecycle scopes use configured SDK registry roles: closed means terminal-done, canceled means terminal-canceled, open means default-open, and in-progress means active without default-open. `staleDays` must be finite and positive; duplicate `threshold` must be greater than zero and at most one. Unknown codes, parameters, keys and invalid values are errors. The current SDK strips custom sections from `readSettings`, so the package validates core settings through that API and retrieves the custom section using public SDK settings-path and storage helpers.
+All rules start enabled. Settings apply enable/disable lists, then per-rule entries, then CLI overrides. Supported severities are `error`, `warn`, and `info`. Supported scopes are `all`, `non_terminal`, `active`, `terminal`, `closed`, `canceled`, `open`, `in_progress`, and `blocked`. Lifecycle scopes use configured SDK registry roles: closed means terminal-done, canceled means terminal-canceled, open means default-open, and in-progress means active without default-open. `staleDays` must be finite and positive; duplicate `threshold` must be greater than zero and at most one. Unknown codes, parameters, keys and invalid values are errors. The package reads `lint` through the public SDK `readSettingsSection` API. The SDK owns document parsing and typed refusals (`settings_section_document_malformed` and `settings_section_invalid`); pm-lint retains rule codes, lifecycle scopes, numeric windows and precedence because these are package policy. An absent section uses the defaults. Core schema and sibling extension sections remain independent.
 
 Exit code `0` means no finding met the failure threshold. Exit code `1` means one or more findings met it. Invalid arguments, settings, incomplete storage, or refused duplicate analysis cause a host error and nonzero exit, rather than a clean lint receipt.
 
