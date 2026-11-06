@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import test from 'node:test';
-import { getSettingsPath } from '@unbrained/pm-cli/sdk';
-import { lintSettingsFromText, objectValue, readLintSettings, resolveConfig, ruleCode, RULE_SCOPES, scopeValue, severityValue } from '../src/settings.ts';
+import { getSettingsPath, isPmCliExpectedError, readSettingsSection, writeSettingsSection } from '@unbrained/pm-cli/sdk';
+import { createExtensionTestHarness } from '@unbrained/pm-cli/sdk/testing';
+import extension from '../index.ts';
+import { lintItems } from '../src/engine.ts';
+import { previewAuthoringRepairs } from '../src/repairs.ts';
+import { objectValue, readLintSettings, resolveConfig, ruleCode, RULE_SCOPES, scopeValue, severityValue } from '../src/settings.ts';
 import { tracker } from './helpers.ts';
 
 /** Verify defaults, per-rule policy, explicit selections and severity overrides. */
@@ -38,8 +42,6 @@ test('settings reject unknown codes, keys, values and parameter windows', () => 
   assert.throws(() => scopeValue('sometimes'));
   assert.throws(() => scopeValue(14));
   assert.throws(() => ruleCode('PML999'));
-  assert.throws(() => lintSettingsFromText(null), /disappeared/);
-  assert.throws(() => lintSettingsFromText('{'), /JSON/);
   const invalid: unknown[] = [{ bad: true }, { enable: 'PML001' }, { disable: ['PML999'] }, { rules: null }, { rules: { PML001: null } }, { rules: { PML001: { typo: true } } }, { rules: { PML001: { enabled: 'true' } } }, { rules: { PML001: { severity: 1 } } }, { rules: { PML001: { scope: 'sometimes' } } }, { rules: { PML005: { parameters: [] } } }];
   for (const raw of invalid) assert.throws(() => resolveConfig(raw));
   for (const number of ['14', 0, -1, Infinity, NaN]) assert.throws(() => resolveConfig({ rules: { PML005: { parameters: { staleDays: number } } } }));
@@ -51,15 +53,72 @@ test('settings reject unknown codes, keys, values and parameter windows', () => 
   assert.throws(() => resolveConfig(undefined, { failOn: 'fatal' }));
 });
 
-/** Reproduce the SDK custom-section gap using real tracker settings bytes. */
-test('SDK storage helpers preserve a custom lint section for validated settings', async t => {
-  const { pmRoot } = await tracker(t);
-  assert.equal(await readLintSettings(pmRoot), undefined);
+/** Missing documents use SDK section defaults, while full lint and repair operations refuse them. */
+test('missing settings documents keep section defaults but refuse lint and repair operations', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ type: 'Task', title: 'Preserve missing settings refusal' })).item;
   const path = getSettingsPath(pmRoot);
-  const raw: Record<string, unknown> = JSON.parse(await readFile(path, 'utf8'));
-  raw.lint = { disable: ['PML003'], rules: { PML005: { parameters: { staleDays: 30 } } } };
-  await writeFile(path, JSON.stringify(raw));
+  await unlink(path);
+  assert.equal(await readLintSettings(pmRoot), undefined);
+  await assert.rejects(lintItems(client, pmRoot));
+  await assert.rejects(readFile(path), { code: 'ENOENT' });
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }));
+  await assert.rejects(readFile(path), { code: 'ENOENT' });
+});
+
+/** Preserve policy parity and independent core/sibling data in a real non-git tracker. */
+test('SDK section reads share validated policy with the registered lint command', async t => {
+  const previousExit = process.exitCode;
+  t.after(() => { process.exitCode = previousExit; });
+  const { client, pmRoot } = await tracker(t);
+  const harness = await createExtensionTestHarness(extension, { capabilities: ['commands', 'schema'] });
+  assert.equal(await readLintSettings(pmRoot), undefined);
+  assert.equal(resolveConfig(await readLintSettings(pmRoot)).failOn, 'error');
+  await client.schemaAddStatus('reviewing', { role: ['active'] });
+  const item = (await client.create({ type: 'Task', title: 'TODO', status: 'reviewing' })).item;
+  const lint = { disable: ['PML003'], failOn: 'info', rules: { PML001: { severity: 'info' }, PML005: { parameters: { staleDays: 30 } } } };
+  await writeSettingsSection(pmRoot, 'lint', lint);
+  await writeSettingsSection(pmRoot, 'sibling', { independent: ['value'], enabled: false });
+  const before = await readFile(getSettingsPath(pmRoot), 'utf8');
+  assert.deepEqual(await readLintSettings(pmRoot), lint);
   const config = resolveConfig(await readLintSettings(pmRoot));
   assert.equal(config.rules.PML003.enabled, false);
   assert.equal(config.rules.PML005.parameters.staleDays, 30);
+  const direct = await lintItems(client, pmRoot);
+  const command = await harness.runCommand({ command: 'lint', pmRoot });
+  assert.deepEqual(command.result, direct);
+  assert.ok(direct.findings.some(row => row.item_id === item.id && row.rule === 'PML001' && row.severity === 'info'));
+  assert.equal(direct.exit_code, 1);
+  const override = await harness.runCommand({ command: 'lint', pmRoot, options: { rule: ['PML001'], severity: 'error', failOn: 'error' } });
+  assert.deepEqual(override.result, await lintItems(client, pmRoot, { rule: ['PML001'], severity: 'error', failOn: 'error' }));
+  assert.equal((await readSettingsSection(pmRoot, 'sibling')).value !== undefined, true);
+  assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), before);
+  // A CLI override must never hide invalid persisted policy. Each invalid value
+  // must be refused by the reader itself as well as the command and engine.
+  for (const invalid of [null, [], 'bad', { typo: true }, { disable: ['PML999'] }, { rules: { PML005: { parameters: { staleDays: 0 } } } }]) {
+    await writeSettingsSection(pmRoot, 'lint', invalid);
+    const bytes = await readFile(getSettingsPath(pmRoot), 'utf8');
+    const refused = (error: unknown): boolean => isPmCliExpectedError(error) && error.code === 'settings_section_invalid' && error.exitCode === 2;
+    await assert.rejects(readLintSettings(pmRoot), refused);
+    await assert.rejects(lintItems(client, pmRoot, { rule: ['PML001'] }), refused);
+    await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refused);
+    await assert.rejects(harness.runCommand({ command: 'lint', pmRoot, options: { rule: ['PML001'] } }), refused);
+    assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), bytes);
+  }
+});
+
+/** Malformed persisted documents must refuse before an empty/default policy can run. */
+test('SDK section reads give typed refusals for malformed settings documents', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ type: 'Task', title: 'Preserve malformed settings refusal' })).item;
+  const harness = await createExtensionTestHarness(extension, { capabilities: ['commands', 'schema'] });
+  for (const bytes of ['{', 'null', '[]', '"text"', '42']) {
+    await writeFile(getSettingsPath(pmRoot), bytes);
+    const refused = (error: unknown): boolean => isPmCliExpectedError(error) && error.code === 'settings_section_document_malformed' && error.exitCode === 2;
+    await assert.rejects(readLintSettings(pmRoot), refused);
+    await assert.rejects(lintItems(client, pmRoot), refused);
+    await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refused);
+    await assert.rejects(harness.runCommand({ command: 'lint', pmRoot }), refused);
+    assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), bytes);
+  }
 });

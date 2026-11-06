@@ -6,7 +6,7 @@ import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult,
 import { REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
 import { lintCorpus } from './engine.ts';
-import { lintSettingsFromText, resolveConfig } from './settings.ts';
+import { readLintSettings, resolveConfig } from './settings.ts';
 import type { RuleCode } from './types.ts';
 
 /** Actionable refusal categories; a refusal never contains a usable patch. */
@@ -131,9 +131,10 @@ export async function previewAuthoringRepairs(pmRoot: string, request: RepairReq
 /** Read and validate exclusively in an owned disposable snapshot. */
 async function buildRepairPreview(pmRoot: string, request: RepairRequest, options: RepairPreviewOptions): Promise<RepairPreview> {
   const client = new PmClient({ pmRoot, noExtensions: true });
+  const config = resolveConfig(await readLintSettings(pmRoot));
+  // Raw bytes remain necessary for the snapshot digest and pre-bootstrap schema fence.
   const settings = await readFileIfExists(getSettingsPath(pmRoot));
   await options.onBoundary?.('settings_read');
-  const config = resolveConfig(lintSettingsFromText(settings));
   // Guard references before readSettings can bootstrap schema files outside the disposable root.
   const schema = (JSON.parse(settings!) as { schema?: Partial<PmSettings['schema']> }).schema;
   const schemaFiles = Object.values(schema?.files ?? {});
