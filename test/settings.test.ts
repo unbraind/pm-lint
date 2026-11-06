@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 import { getSettingsPath, isPmCliExpectedError, readSettingsSection, writeSettingsSection } from '@unbrained/pm-cli/sdk';
 import { createExtensionTestHarness } from '@unbrained/pm-cli/sdk/testing';
@@ -53,6 +53,19 @@ test('settings reject unknown codes, keys, values and parameter windows', () => 
   assert.throws(() => resolveConfig(undefined, { failOn: 'fatal' }));
 });
 
+/** Missing documents use SDK section defaults, while full lint and repair operations refuse them. */
+test('missing settings documents keep section defaults but refuse lint and repair operations', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ type: 'Task', title: 'Preserve missing settings refusal' })).item;
+  const path = getSettingsPath(pmRoot);
+  await unlink(path);
+  assert.equal(await readLintSettings(pmRoot), undefined);
+  await assert.rejects(lintItems(client, pmRoot));
+  await assert.rejects(readFile(path), { code: 'ENOENT' });
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }));
+  await assert.rejects(readFile(path), { code: 'ENOENT' });
+});
+
 /** Preserve policy parity and independent core/sibling data in a real non-git tracker. */
 test('SDK section reads share validated policy with the registered lint command', async t => {
   const previousExit = process.exitCode;
@@ -97,12 +110,14 @@ test('SDK section reads share validated policy with the registered lint command'
 /** Malformed persisted documents must refuse before an empty/default policy can run. */
 test('SDK section reads give typed refusals for malformed settings documents', async t => {
   const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ type: 'Task', title: 'Preserve malformed settings refusal' })).item;
   const harness = await createExtensionTestHarness(extension, { capabilities: ['commands', 'schema'] });
   for (const bytes of ['{', 'null', '[]', '"text"', '42']) {
     await writeFile(getSettingsPath(pmRoot), bytes);
     const refused = (error: unknown): boolean => isPmCliExpectedError(error) && error.code === 'settings_section_document_malformed' && error.exitCode === 2;
     await assert.rejects(readLintSettings(pmRoot), refused);
     await assert.rejects(lintItems(client, pmRoot), refused);
+    await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refused);
     await assert.rejects(harness.runCommand({ command: 'lint', pmRoot }), refused);
     assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), bytes);
   }
