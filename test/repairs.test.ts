@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { encode, decode } from '@toon-format/toon';
+import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
 import { chmod, mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -46,7 +48,7 @@ test('mechanical preview validates through core, preserves substantive questions
   assert.ok(result.questions.some(row => row.code === 'PML003'));
   assert.ok(result.questions.some(row => row.field === 'expected_result' && row.question.endsWith('?')));
   assert.equal(result.writes, 0);
-  assert.deepEqual(await previewAuthoringRepairs(pmRoot, { id: item.id, revision: result.revision }), result);
+  assertRepairReplay(await previewAuthoringRepairs(pmRoot, { id: item.id, revision: result.revision }), result);
   assert.equal(await inventory(pmRoot), before);
   // Independently apply only the suggested fields using core; then read state back through the SDK.
   await client.update(item.id, { title: result.patch.title, tags: JSON.stringify(result.patch.tags) });
@@ -246,4 +248,29 @@ test('referenced schema cannot be silently dropped with excluded foreign operati
     await unchangedRefusal(pmRoot, item.id);
     assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
   }
+});
+
+/** SDK receipts retain full fresh stage evidence and exactly match their JSON representation. */
+test('staged repair validation is JSON-compatible without losing native records or metadata', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Preserve native validation context', type: 'Issue', description: 'Preserved source description', assignee: 'fixture-owner' })).item;
+  await seed(pmRoot, { ...item, comments: [{ author: 'fixture', created_at: item.created_at, text: 'Preserve native comment' }], files: [{ path: 'src/repairs.ts', scope: 'project' }] });
+  const before = await inventory(pmRoot);
+  const receipt = await previewAuthoringRepairs(pmRoot, { id: item.id });
+  assert.deepEqual(JSON.parse(JSON.stringify(receipt)), receipt);
+  assert.deepEqual(decode(encode(receipt)), receipt);
+  assert.equal(receipt.validation?.records.length, 1);
+  const record = receipt.validation!.records[0];
+  assert.equal(record.id, item.id);
+  assert.equal(record.op, 'update');
+  assert.equal(record.execution, 'applied');
+  assert.equal(record.item.title, receipt.patch.title);
+  assert.deepEqual(record.item.tags, receipt.patch.tags);
+  assert.equal(record.item.description, item.description);
+  assert.equal(record.item.assignee, item.assignee);
+  assert.equal(record.item.created_at, item.created_at);
+  assert.equal(record.item.comments![0].text, 'Preserve native comment');
+  assert.equal(record.item.files![0].path, 'src/repairs.ts');
+  assert.ok(record.commit_time_fields.includes('/updated_at'));
+  assert.equal(await inventory(pmRoot), before);
 });
