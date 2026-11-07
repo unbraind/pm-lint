@@ -1,0 +1,21 @@
+id: pm-lint-github-253a36d6af64-62
+title: Track v2026.11.05 partial delivery after npm publish succeeded but tag push failed
+description: "GH issue #62: https://github.com/unbraind/pm-lint/issues/62 · author @unbraind · created 2026-11-05T16:53:32Z · updated 2026-11-05T16:53:32Z"
+type: Issue
+status: open
+priority: 2
+tags[2]: "gh:unbraind/pm-lint#62","github_author:unbraind"
+created_at: "2026-11-05T16:53:32Z"
+updated_at: "2026-11-07T07:13:59.696Z"
+author: pm-github
+github_close_reason: ""
+github_closed_at: ""
+github_created_at: "2026-11-05T16:53:32Z"
+github_link_only: false
+github_number: 62
+github_release: ""
+github_state: open
+github_state_reason: unspecified
+github_updated_at: "2026-11-05T16:53:32Z"
+github_url: "https://github.com/unbraind/pm-lint/issues/62"
+body: "The [Daily Release run 42017095728](https://github.com/unbraind/pm-lint/actions/runs/42017095728), attempt 2, partially delivered the release on 2026-11-05.\n\n## Verified sequence\n\nThe [release job 127309201562](https://github.com/unbraind/pm-lint/actions/runs/42017095728/job/127309201562) reports:\n\n- Release metadata was merged through [PR #61](https://github.com/unbraind/pm-lint/pull/61), and merged-release verification passed.\n- At 16:08:40 UTC, npm reported `+ @unbrained/pm-lint@2026.11.5` and `Published with provenance on attempt 1.` The `Publish npm package` step succeeded.\n- At 16:08:53 UTC, GitHub rejected the `v2026.11.05` push with `fatal error in commit_refs_rules`; the step exited 1.\n- `Create GitHub release` was skipped. The run's `verify_bun` and `resume_release` jobs were also skipped.\n\nAt 16:50 UTC, official run/job reads still showed completed/failure on attempt 2, last updated 16:09 UTC. The latest 30 workflow runs showed no later Daily Release run. This is an npm-published/tag-push-failed delivery, not an npm publication failure.\n\n## Source goal and expected behavior\n\nObserved commit: `99825c76096b00c7bfda4b1b4111c0a6eb23138f`, the merged main release commit. The [exact release workflow](https://github.com/unbraind/pm-lint/blob/99825c76096b00c7bfda4b1b4111c0a6eb23138f/.github/workflows/release.yml) sequences npm publication, release-tag push and GitHub release creation, with a separate Bun verification job. Its tag-push guard explicitly aims to prevent an npm-ahead-of-git state. The observed failure left those downstream delivery steps incomplete in this run.\n\n## Desired outcome\n\nEstablish and record the current delivery state of this exact version, complete any outstanding tag/GitHub release/post-publication verification through the approved release process, and attach the resulting evidence. Preserve the existing published npm version and provenance. Do not treat skipped verification as success.\n\nThe rejection text alone does not identify the underlying cause. This report does not prescribe a ruleset change, force-push, republish, or blind workflow retry. Current tag/GitHub release existence and registry consumer availability were not independently rechecked; out-of-band recovery should be checked before taking action.\n\n## Ownership check\n\nAll 61 all-status issues/PRs, relevant release discussions, and all 26 canonical PM item records at main `99825c76096b00c7bfda4b1b4111c0a6eb23138f` were checked. No exact existing owner was found. The earlier [PR #41](https://github.com/unbraind/pm-lint/pull/41) and its `pm-lint-4tem` record concern npm misreading a bare relative tarball path before publication, a different failure phase. The general release epic and merged PR #61 do not record this post-publication tag rejection.\n\n## Acceptance and recovery evidence\n\n- First reconcile the current npm version, provenance, matching tag and GitHub release, including possible out-of-band recovery. Record exact version/commit evidence.\n- Complete only still-missing delivery stages through the approved release process, preserving the already-published artifact and avoiding duplicate publication or unrelated version changes.\n- Record successful post-publication Bun consumer verification, or an explicit supported disposition if it cannot run.\n- Retain existing identity, provenance, protected-reference and release checks. Do not count skipped stages as passed or infer the cause from the server error alone."
