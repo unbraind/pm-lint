@@ -10,14 +10,14 @@ export const REPAIR_EXCLUDED_STATE: Readonly<Record<string, string>> = { runtime
 /** Resolve excluded root entries once for snapshot copying and fingerprints. */
 const SKIPPED = new Set(Object.keys(REPAIR_EXCLUDED_STATE));
 
-/** Fingerprint regular source files and names without creating SDK caches in the source tracker. */
-async function fingerprint(root: string): Promise<string> {
+/** Bind retained file bytes and names; settings can be compared separately by semantic section. */
+export async function fingerprint(root: string, omitSettings = false): Promise<string> {
   const hash = createHash('sha256');
   /** Recurse only inside the selected tracker and refuse links or special files. */
   async function visit(directory: string): Promise<void> {
     for (const entry of (await readdir(directory, { withFileTypes: true })).sort(/** Stable source ordering makes copy checks deterministic. */ (a, b) => a.name.localeCompare(b.name))) {
       const path = join(directory, entry.name);
-      if (SKIPPED.has(relative(root, path).split(/[\\/]/)[0])) continue;
+      if (SKIPPED.has(relative(root, path).split(/[\\/]/)[0]) || (omitSettings && relative(root, path) === 'settings.json')) continue;
       if (entry.isDirectory()) await visit(path);
       else if (entry.isFile()) { const bytes = await readFile(path); hash.update(JSON.stringify([relative(root, path), bytes.length])); hash.update(bytes); }
       else throw new RepairRefusal('unsafe_repair', 'Repair context requires regular tracker files.', 'Replace symbolic links or special files with ordinary tracker files before requesting a preview.');

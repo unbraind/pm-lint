@@ -4,7 +4,7 @@ import { relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
-import { REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
+import { fingerprint, REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
 import { lintCorpus } from './engine.ts';
 import { objectValue, readLintSettings, resolveConfig } from './settings.ts';
@@ -110,9 +110,9 @@ function assertRequest(request: RepairRequest): void {
 }
 
 /** Hash all certified context so concurrent peer edits cannot silently change relationship-dependent questions. */
-function contextRevision(source: PmCompleteListResult, settings: string | null): string {
+function contextRevision(source: PmCompleteListResult, settings: string | null, schema: unknown): string {
   const items = certifyCompleteListResult(source).items.map(/** Bind all native fields, not just the proposed patch content. */ item => [item.id, sourceDigest(item)]).sort(/** Canonical ids make scan ordering irrelevant. */ (left, right) => left[0].localeCompare(right[0]));
-  return createHash('sha256').update(JSON.stringify([items, settings])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([items, settings, schema])).digest('hex');
 }
 
 /** Read boundaries available to deterministic interleaving tests and observational instrumentation. */
@@ -133,6 +133,8 @@ export async function previewAuthoringRepairs(pmRoot: string, request: RepairReq
 async function buildRepairPreview(pmRoot: string, request: RepairRequest, options: RepairPreviewOptions): Promise<RepairPreview> {
   // Raw bytes remain necessary for the snapshot digest and pre-bootstrap schema fence.
   const settings = await readFileIfExists(getSettingsPath(pmRoot));
+  // Bind every retained input, including default/custom schema paths and absent files, before hooks.
+  const retainedFiles = await fingerprint(pmRoot, true);
   const lintSettings = await readLintSettings(pmRoot);
   const config = resolveConfig(lintSettings);
   await options.onBoundary?.('settings_read');
@@ -148,7 +150,7 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
     // Recheck the copied document before schema loading can follow changed references.
     let observed: Record<string, unknown>;
     try { observed = objectValue(JSON.parse((await readFileIfExists(getSettingsPath(boundRoot))) ?? 'null')); } catch { throw staleRevision(); }
-    if (!isDeepStrictEqual(document.schema, observed.schema)) throw staleRevision();
+    if (!isDeepStrictEqual(document.schema, observed.schema) || !isDeepStrictEqual(document.lint, observed.lint) || await fingerprint(boundRoot, true) !== retainedFiles) throw staleRevision();
     // Disable hooks throughout every core read in the private snapshot, including staging.
     return runWithActiveExtensions({ path: boundRoot, noExtensions: true }, async () => {
       await options.onBoundary?.('settings_bound');
@@ -157,7 +159,8 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
       if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(boundRoot, resolve(boundRoot, file)).split(sep)[0]))) {
         throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
       }
-      try { await loadGuardedRuntimeSchema(boundRoot, schema); } catch {
+      let schemaContext: Awaited<ReturnType<typeof loadGuardedRuntimeSchema>>;
+      try { schemaContext = await loadGuardedRuntimeSchema(boundRoot, schema); } catch {
         throw new RepairRefusal('unsafe_repair', 'Schema references must stay inside the repair snapshot.', 'Use regular tracker-relative schema files before requesting a preview.');
       }
       const client = new PmClient({ pmRoot: boundRoot, noExtensions: true });
@@ -175,7 +178,7 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
       await options.onBoundary?.('source_read');
       const revision = createHash('sha256').update(JSON.stringify([sourceDigest(item), raw])).digest('hex');
       if (request.revision !== undefined && request.revision !== revision) throw staleRevision();
-      const context = contextRevision(source, settings);
+      const context = contextRevision(source, settings, schemaContext);
       const original = located!.item_format === 'toon' ? decode(raw!) : JSON.parse(splitFrontMatter(raw!).frontMatter) as unknown;
       const { findings, patch } = mechanicalRepairs(item, (original as Record<string, unknown>).tags);
       if (Buffer.byteLength(JSON.stringify(patch)) > 16384) throw new RepairRefusal('limit_exceeded', 'The mechanical patch exceeds 16 KiB.', 'Review this item directly with pm get --full; repair the oversized field explicitly.');

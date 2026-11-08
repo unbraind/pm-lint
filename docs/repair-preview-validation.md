@@ -9,6 +9,13 @@ exposed read/plan/validation boundary.
 Repair plans compare the SDK-validated lint section with the section in their
 captured settings bytes before deriving questions. Schema settings and every
 core key recognized by the pinned SDK must also agree before plan generation.
+Before any read hook runs, the preview fingerprints every retained file name and
+byte (including default/custom schema paths and absent files). The private copy
+must match that fingerprint and the captured lint section before core reads.
+Settings sections use semantic equality to preserve independent sibling settings;
+all other retained inputs use byte equality. The SDK-loaded effective schema also binds
+the plan key, so schema policy changes cannot reuse an older plan identity.
+Audit history and equivalent schema formatting do not alter plan identity.
 After the initial section read, a second stability-checked snapshot hides the
 core-read root from hooks that may have scheduled deferred writes to the first
 snapshot. All schema reads, planning and validation run against that private
