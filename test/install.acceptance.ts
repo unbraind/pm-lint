@@ -287,6 +287,35 @@ try {
 console.log('packed-repair-policy-bound-ok');
 `);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-policy-sdk.mjs'], pmRoot), /packed-repair-policy-bound-ok/);
+    // Packed consumers also reject schema-only edits and suppress later hook interleavings.
+    await writeFile(join(cwd, 'repair-schema-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const path = resolve('.agents/pm/settings.json');
+const before = await readFile(path, 'utf8');
+const settings = JSON.parse(before);
+const expected = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });
+try {
+  for (const delay of [false, true]) {
+    let calls = 0;
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-schema-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      if (context.path.endsWith('settings.json') && ++calls > (delay ? 1 : 0)) {
+        await writeFile(context.path, JSON.stringify({ ...settings, schema: { files: { fields: 'schema/alternate-fields.json' } } }));
+      }
+    } }] });
+    if (delay) assert.deepEqual(await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), expected);
+    else await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    assert.equal(calls, 1);
+    assert.equal(await readFile(path, 'utf8'), before);
+    clearActiveExtensionHooks();
+  }
+} finally { clearActiveExtensionHooks(); }
+console.log('packed-repair-schema-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-schema-sdk.mjs'], pmRoot), /packed-repair-schema-bound-ok/);
     // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
     const state = join(cwd, 'lint.local.json');
     const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);

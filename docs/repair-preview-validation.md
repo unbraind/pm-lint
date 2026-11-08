@@ -7,13 +7,19 @@ source byte/name equality, substantive questions, stale revision refusals,
 exposed read/plan/validation boundary.
 
 Repair plans compare the SDK-validated lint section with the section in their
-captured settings bytes before deriving questions. A mismatch returns
+captured settings bytes before deriving questions. Schema settings and every
+core key recognized by the pinned SDK must also agree before plan generation.
+After the initial section read, the remaining schema reads, planning and
+validation run in an isolated SDK extension scope so later hooks cannot switch
+configuration, including change-and-restore interleavings. A mismatch returns
 `stale_revision` without a patch. Real asynchronous SDK read hooks exercise
 absent/present sections, every built-in rule, severity, scopes and parameters
 through the API and command handler; refusal receipts round trip through JSON
 and TOON. Equivalent object-key ordering and independent settings remain valid,
 and the source tracker stays byte-identical. Packed Node and native Bun consumers
-also inject policy changes through real hooks. Reverting the preview builder or
+also inject policy and schema-only changes through real hooks. A generated
+core-key matrix checks refusals before source reads, and separate cases cover
+removed/malformed settings and late hooks through mechanical validation. Reverting the preview builder or
 removing only the comparison makes the adversarial test fail; restoring the
 implementation makes it pass.
 

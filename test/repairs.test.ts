@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { encode, decode } from '@toon-format/toon';
 import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
-import { chmod, mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, readSettings, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -15,6 +15,17 @@ import { mechanicalRepairs } from '../src/repairs.ts';
 import { runRepairCommand } from '../src/repair-command.ts';
 import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
 import { RULES } from '../src/rules.ts';
+
+/** Verify all refusal transport fields without dropping either renderer round trip. */
+async function assertStaleRepairCommand(pmRoot: string, id: string): Promise<void> {
+  const command = await runRepairCommand({ command: 'lint repair', args: [], options: { id }, pm_root: pmRoot, global: {} });
+  assert.equal(command.ok, false);
+  assert.equal((command.refusal as { code: string }).code, 'stale_revision');
+  assert.equal(command.writes, 0);
+  assert.equal(command.exit_code, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(command)), command);
+  assert.deepEqual(decode(encode(command)), command);
+}
 
 /** Exercise real asynchronous SDK hooks without allowing writes to the authoritative tracker. */
 test('every repair policy must equal the settings policy bound into its plan digest', async t => {
@@ -42,17 +53,89 @@ test('every repair policy must equal the settings policy bound into its plan dig
     } }] });
     try {
       await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('stale_revision'));
-      const command = await runRepairCommand({ command: 'lint repair', args: [], options: { id: item.id }, pm_root: pmRoot, global: {} });
-      assert.equal(command.ok, false);
-      assert.equal((command.refusal as { code: string }).code, 'stale_revision');
-      assert.equal(command.writes, 0);
-      assert.equal(command.exit_code, 2);
-      assert.deepEqual(JSON.parse(JSON.stringify(command)), command);
-      assert.deepEqual(decode(encode(command)), command);
+      await assertStaleRepairCommand(pmRoot, item.id);
       assert.equal(calls, 2, 'both SDK and command paths exercised the real hook');
       assert.equal(await inventory(pmRoot), before);
     } finally { clearActiveExtensionHooks(); }
   }
+});
+
+/** Vary every SDK-recognized core input while keeping lint policy unchanged. */
+test('every core setting must match captured repair settings before schema-dependent reads', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Bind all core repair inputs', type: 'Task' })).item;
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const core = await readSettings(pmRoot);
+  const schemas = ['types', 'statuses', 'fields', 'workflows'].map(key => ({ ...settings, schema: { files: { [key]: `schema/alternate-${key}.json` } } }));
+  const replacements = [...Object.keys(core).map(key => ({ ...settings, [key]: settings[key] === null ? false : null })), ...schemas, { ...settings, schema: { files: { fields: '../unfenced-fields.json' } } }];
+  const before = await inventory(pmRoot);
+  t.after(clearActiveExtensionHooks);
+  for (const replacement of replacements) {
+    let calls = 0;
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'core-settings-interleaving', run: async context => {
+      assert.notEqual(context.path, path);
+      if (context.path.endsWith('settings.json')) { calls++; await writeFile(context.path, JSON.stringify(replacement)); }
+    } }] });
+    try {
+      const boundaries: RepairBoundary[] = [];
+      await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => { boundaries.push(step); } }), refusal('stale_revision'));
+      assert.deepEqual(boundaries, ['snapshot_read', 'settings_read']);
+      await assertStaleRepairCommand(pmRoot, item.id);
+      assert.equal(calls, 2);
+      assert.equal(await inventory(pmRoot), before);
+    } finally { clearActiveExtensionHooks(); }
+  }
+});
+
+/** A later hook cannot switch schema during reads or restore it after validation (ABA). */
+test('repair schema remains isolated from later SDK hooks through planning and validation', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Keep fenced schema stable', type: 'Task' })).item;
+  await seed(pmRoot, item);
+  const expected = await previewAuthoringRepairs(pmRoot, { id: item.id });
+  assert.equal(expected.validation?.validated, true);
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const before = await inventory(pmRoot);
+  let calls = 0;
+  t.after(clearActiveExtensionHooks);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'late-schema-interleaving', run: async context => {
+    assert.notEqual(context.path, path);
+    if (context.path.endsWith('settings.json') && ++calls > 1) {
+      await writeFile(context.path, JSON.stringify(calls % 2 === 0 ? { ...settings, schema: { files: { fields: 'schema/alternate-fields.json' } } } : settings));
+    }
+  } }] });
+  try {
+    assertRepairReplay(await previewAuthoringRepairs(pmRoot, { id: item.id }), expected);
+    assert.equal(calls, 1, 'only the initial SDK section read runs external hooks');
+    assert.equal(await inventory(pmRoot), before);
+  } finally { clearActiveExtensionHooks(); }
+});
+
+/** Missing or malformed settings introduced after a successful SDK read cannot reach schema loading. */
+test('repair settings recheck refuses removed and malformed captured documents', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Reject replaced settings after section read', type: 'Task' })).item;
+  const path = getSettingsPath(pmRoot);
+  const before = await inventory(pmRoot);
+  let snapshotPath = '';
+  t.after(clearActiveExtensionHooks);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'remember-settings-read', run: async context => {
+    assert.notEqual(context.path, path);
+    if (context.path.endsWith('settings.json')) snapshotPath = context.path;
+  } }] });
+  try {
+    for (const bytes of [null, '{', '[]', 'null']) {
+      await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
+        if (step === 'settings_read') {
+          if (bytes === null) await unlink(snapshotPath);
+          else await writeFile(snapshotPath, bytes);
+        }
+      } }), refusal('stale_revision'));
+      assert.equal(await inventory(pmRoot), before);
+    }
+  } finally { clearActiveExtensionHooks(); }
 });
 
 /** Equivalent object order and independent settings are compatible; malformed captured bytes refuse. */

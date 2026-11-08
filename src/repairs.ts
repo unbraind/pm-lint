@@ -2,7 +2,7 @@ import { decode } from '@toon-format/toon';
 import { createHash, randomUUID } from 'node:crypto';
 import { relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
 import { REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
@@ -143,49 +143,58 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   try { document = objectValue(JSON.parse(settings)); } catch { throw staleRevision(); }
   // SDK read hooks may change the snapshot: never certify questions under different policy bytes.
   if (!isDeepStrictEqual(lintSettings, document.lint)) throw staleRevision();
-  const schema = document.schema as Partial<PmSettings['schema']> | undefined;
-  const schemaFiles = Object.values(schema?.files ?? {});
-  if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(pmRoot, resolve(pmRoot, file)).split(sep)[0]))) {
-    throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
-  }
-  try { await loadGuardedRuntimeSchema(pmRoot, schema); } catch {
-    throw new RepairRefusal('unsafe_repair', 'Schema references must stay inside the repair snapshot.', 'Use regular tracker-relative schema files before requesting a preview.');
-  }
-  const nativeSettings = await readSettings(pmRoot);
-  const registry = resolveItemTypeRegistry(nativeSettings);
-  // Preserve pre-migration bytes: the pinned SDK may canonicalize legacy Markdown while reading.
-  const located = await locateItem(pmRoot, request.id, nativeSettings.id_prefix, nativeSettings.item_format, registry.type_to_folder);
-  const raw = located === null ? null : await readFileIfExists(located.itemPath);
-  const source = await client.listAllComplete();
-  const corpus = certifyCompleteListResult(source);
-  const item = corpus.items.find(/** Only canonical identities are accepted. */ row => row.id === request.id);
-  if (item === undefined) throw new RepairRefusal('unknown_item', 'The requested item is absent from the certified tracker.', 'Select a current item id from pm list and request a new preview.');
-  await options.onBoundary?.('source_read');
-  const revision = createHash('sha256').update(JSON.stringify([sourceDigest(item), raw])).digest('hex');
-  if (request.revision !== undefined && request.revision !== revision) throw staleRevision();
-  const context = contextRevision(source, settings);
-  const original = located!.item_format === 'toon' ? decode(raw!) : JSON.parse(splitFrontMatter(raw!).frontMatter) as unknown;
-  const { findings, patch } = mechanicalRepairs(item, (original as Record<string, unknown>).tags);
-  if (Buffer.byteLength(JSON.stringify(patch)) > 16384) throw new RepairRefusal('limit_exceeded', 'The mechanical patch exceeds 16 KiB.', 'Review this item directly with pm get --full; repair the oversized field explicitly.');
-  const questions: RepairQuestion[] = lintCorpus(source, config, { id: [item.id] }).findings.map(/** Existing diagnostics become questions without generating answers. */ finding => ({ code: finding.rule, field: finding.field, question: QUESTIONS[finding.rule] }));
-  if (item.type === 'Issue' && toNonEmptyImportString(item.expected_result) === undefined) questions.push({ code: 'missing_expected_behavior', field: 'expected_result', question: 'What should happen for the reported reproduction steps?' });
-  const planKey = createHash('sha256').update(JSON.stringify([1, revision, context, patch])).digest('hex');
-  let validation: ItemMutationPreviewValidation | null = null;
-  if (findings.length > 0) {
-    try {
-      const plan = await planItemMutationDocument({ pmRoot, transactionId: `lint-repair-${planKey}`, input: JSON.stringify([{ op: 'update', id: item.id, options: { ...patch, ...(patch.tags === undefined ? {} : { tags: JSON.stringify(patch.tags) }) } }]) });
-      await options.onBoundary?.('planned');
-      // A fresh disposable validation identity avoids replaying a source journal, including foreign records.
-      const staged = await previewItemMutations({ pmRoot, author: 'lint-preview', transactionId: `lint-preview-${randomUUID()}`, mutations: plan.mutations });
-      // Native optional properties must have the same absence semantics on SDK, JSON and TOON surfaces.
-      validation = JSON.parse(JSON.stringify(staged)) as ItemMutationPreviewValidation;
-    } catch {
-      throw new RepairRefusal('unsafe_repair', 'Core could not freshly validate the proposed repair.', 'Run pm validate and inspect ownership/schema constraints; refresh the preview after resolving them.');
+  // Recheck before schema loading can follow references changed by the section-read hook.
+  let observed: Record<string, unknown>;
+  try { observed = objectValue(JSON.parse((await readFileIfExists(getSettingsPath(pmRoot))) ?? 'null')); } catch { throw staleRevision(); }
+  if (!isDeepStrictEqual(document.schema, observed.schema)) throw staleRevision();
+  // No later SDK read hook may replace configuration after this fence (including ABA edits).
+  return runWithActiveExtensions({ path: pmRoot, noExtensions: true }, async () => {
+    const schema = document.schema as Partial<PmSettings['schema']> | undefined;
+    const schemaFiles = Object.values(schema?.files ?? {});
+    if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(pmRoot, resolve(pmRoot, file)).split(sep)[0]))) {
+      throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
     }
-  }
-  await options.onBoundary?.('validated');
-  await options.onBoundary?.('source_rechecked');
-  return { version: 1, id: item.id, revision, plan_key: planKey, corpus_count: corpus.items.length, writes: 0, findings, patch, questions, validation, excluded_state: { ...REPAIR_EXCLUDED_STATE }, remaining_mechanical: mechanicalRepairs({ ...item, ...patch }).findings.length };
+    try { await loadGuardedRuntimeSchema(pmRoot, schema); } catch {
+      throw new RepairRefusal('unsafe_repair', 'Schema references must stay inside the repair snapshot.', 'Use regular tracker-relative schema files before requesting a preview.');
+    }
+    const nativeSettings = await readSettings(pmRoot);
+    // Compare every core key recognized by this SDK; unrelated extension sections stay independent.
+    if (Object.keys(nativeSettings).some(/** Bind all core settings without maintaining a second key registry. */ key => !isDeepStrictEqual(document[key], observed[key]))) throw staleRevision();
+    const registry = resolveItemTypeRegistry(nativeSettings);
+    // Preserve pre-migration bytes: the pinned SDK may canonicalize legacy Markdown while reading.
+    const located = await locateItem(pmRoot, request.id, nativeSettings.id_prefix, nativeSettings.item_format, registry.type_to_folder);
+    const raw = located === null ? null : await readFileIfExists(located.itemPath);
+    const source = await client.listAllComplete();
+    const corpus = certifyCompleteListResult(source);
+    const item = corpus.items.find(/** Only canonical identities are accepted. */ row => row.id === request.id);
+    if (item === undefined) throw new RepairRefusal('unknown_item', 'The requested item is absent from the certified tracker.', 'Select a current item id from pm list and request a new preview.');
+    await options.onBoundary?.('source_read');
+    const revision = createHash('sha256').update(JSON.stringify([sourceDigest(item), raw])).digest('hex');
+    if (request.revision !== undefined && request.revision !== revision) throw staleRevision();
+    const context = contextRevision(source, settings);
+    const original = located!.item_format === 'toon' ? decode(raw!) : JSON.parse(splitFrontMatter(raw!).frontMatter) as unknown;
+    const { findings, patch } = mechanicalRepairs(item, (original as Record<string, unknown>).tags);
+    if (Buffer.byteLength(JSON.stringify(patch)) > 16384) throw new RepairRefusal('limit_exceeded', 'The mechanical patch exceeds 16 KiB.', 'Review this item directly with pm get --full; repair the oversized field explicitly.');
+    const questions: RepairQuestion[] = lintCorpus(source, config, { id: [item.id] }).findings.map(/** Existing diagnostics become questions without generating answers. */ finding => ({ code: finding.rule, field: finding.field, question: QUESTIONS[finding.rule] }));
+    if (item.type === 'Issue' && toNonEmptyImportString(item.expected_result) === undefined) questions.push({ code: 'missing_expected_behavior', field: 'expected_result', question: 'What should happen for the reported reproduction steps?' });
+    const planKey = createHash('sha256').update(JSON.stringify([1, revision, context, patch])).digest('hex');
+    let validation: ItemMutationPreviewValidation | null = null;
+    if (findings.length > 0) {
+      try {
+        const plan = await planItemMutationDocument({ pmRoot, transactionId: `lint-repair-${planKey}`, input: JSON.stringify([{ op: 'update', id: item.id, options: { ...patch, ...(patch.tags === undefined ? {} : { tags: JSON.stringify(patch.tags) }) } }]) });
+        await options.onBoundary?.('planned');
+        // A fresh disposable validation identity avoids replaying a source journal, including foreign records.
+        const staged = await previewItemMutations({ pmRoot, author: 'lint-preview', transactionId: `lint-preview-${randomUUID()}`, mutations: plan.mutations });
+        // Native optional properties must have the same absence semantics on SDK, JSON and TOON surfaces.
+        validation = JSON.parse(JSON.stringify(staged)) as ItemMutationPreviewValidation;
+      } catch {
+        throw new RepairRefusal('unsafe_repair', 'Core could not freshly validate the proposed repair.', 'Run pm validate and inspect ownership/schema constraints; refresh the preview after resolving them.');
+      }
+    }
+    await options.onBoundary?.('validated');
+    await options.onBoundary?.('source_rechecked');
+    return { version: 1, id: item.id, revision, plan_key: planKey, corpus_count: corpus.items.length, writes: 0, findings, patch, questions, validation, excluded_state: { ...REPAIR_EXCLUDED_STATE }, remaining_mechanical: mechanicalRepairs({ ...item, ...patch }).findings.length };
+  });
 }
 
 /** Explain stale evidence without ever returning a frozen patch for reuse. */
