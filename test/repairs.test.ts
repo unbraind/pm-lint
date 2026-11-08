@@ -4,7 +4,7 @@ import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
 import { chmod, mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { certifyCompleteListResult, getItemPath, serializeItemDocument } from '@unbrained/pm-cli/sdk';
+import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -14,6 +14,73 @@ import type { RepairBoundary, RepairRequest } from '../index.ts';
 import { mechanicalRepairs } from '../src/repairs.ts';
 import { runRepairCommand } from '../src/repair-command.ts';
 import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
+import { RULES } from '../src/rules.ts';
+
+/** Exercise real asynchronous SDK hooks without allowing writes to the authoritative tracker. */
+test('every repair policy must equal the settings policy bound into its plan digest', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Bind policy to certified repair context', type: 'Task' })).item;
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const policies: unknown[] = [undefined, {}, { failOn: 'warn' }, ...RULES.flatMap(rule => [
+    { disable: [rule.code] }, { enable: [rule.code] },
+    { rules: { [rule.code]: { enabled: false, severity: 'info', scope: 'all' } } },
+  ]), { rules: { PML005: { parameters: { staleDays: 29 } }, PML010: { parameters: { threshold: 0.5 } } } }];
+  t.after(clearActiveExtensionHooks);
+  for (let index = 0; index < policies.length; index++) {
+    const lint = policies[index];
+    await writeFile(path, JSON.stringify({ ...settings, lint }));
+    const before = await inventory(pmRoot);
+    let calls = 0;
+    const replacement = policies[(index + 1) % policies.length];
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'policy-interleaving', run: async context => {
+      assert.notEqual(context.path, path, 'hooks may only mutate the disposable snapshot');
+      if (context.path.endsWith('settings.json')) {
+        calls++;
+        await writeFile(context.path, JSON.stringify({ ...settings, lint: replacement }));
+      }
+    } }] });
+    try {
+      await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('stale_revision'));
+      const command = await runRepairCommand({ command: 'lint repair', args: [], options: { id: item.id }, pm_root: pmRoot, global: {} });
+      assert.equal(command.ok, false);
+      assert.equal((command.refusal as { code: string }).code, 'stale_revision');
+      assert.equal(command.writes, 0);
+      assert.equal(command.exit_code, 2);
+      assert.deepEqual(JSON.parse(JSON.stringify(command)), command);
+      assert.deepEqual(decode(encode(command)), command);
+      assert.equal(calls, 2, 'both SDK and command paths exercised the real hook');
+      assert.equal(await inventory(pmRoot), before);
+    } finally { clearActiveExtensionHooks(); }
+  }
+});
+
+/** Equivalent object order and independent settings are compatible; malformed captured bytes refuse. */
+test('repair policy binding accepts equivalent sections and refuses replaced malformed documents', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Keep compatible policy snapshots readable', type: 'Task' })).item;
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const lint = { failOn: 'warn', rules: { PML002: { enabled: false, severity: 'info' } } };
+  await writeFile(path, JSON.stringify({ ...settings, lint }));
+  const expected = await previewAuthoringRepairs(pmRoot, { id: item.id });
+  t.after(clearActiveExtensionHooks);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'compatible-policy', run: async context => {
+    assert.notEqual(context.path, path);
+    if (context.path.endsWith('settings.json')) await writeFile(context.path, JSON.stringify({ ...settings, sibling: { preserved: true }, lint: { rules: { PML002: { severity: 'info', enabled: false } }, failOn: 'warn' } }));
+  } }] });
+  try {
+    const before = await inventory(pmRoot);
+    assertRepairReplay(await previewAuthoringRepairs(pmRoot, { id: item.id }), expected);
+    assert.equal(await inventory(pmRoot), before);
+    for (const bytes of ['{', 'null', '[]', '42', '"text"']) {
+      await writeFile(path, bytes);
+      const malformed = await inventory(pmRoot);
+      await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refusal('stale_revision'));
+      assert.equal(await inventory(pmRoot), malformed);
+    }
+  } finally { clearActiveExtensionHooks(); }
+});
 
 /** Seed surface debt that ordinary SDK authoring already normalizes away. */
 async function seed(pmRoot: string, item: ItemMetadata, title = '  Verify observable behavior \r\n', tags = ['one', 'one', ' two ']): Promise<void> {

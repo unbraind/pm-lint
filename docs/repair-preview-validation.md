@@ -6,6 +6,17 @@ source byte/name equality, substantive questions, stale revision refusals,
 16 KiB bounds, foreign-state exclusion and concurrent peer edits at every
 exposed read/plan/validation boundary.
 
+Repair plans compare the SDK-validated lint section with the section in their
+captured settings bytes before deriving questions. A mismatch returns
+`stale_revision` without a patch. Real asynchronous SDK read hooks exercise
+absent/present sections, every built-in rule, severity, scopes and parameters
+through the API and command handler; refusal receipts round trip through JSON
+and TOON. Equivalent object-key ordering and independent settings remain valid,
+and the source tracker stays byte-identical. Packed Node and native Bun consumers
+also inject policy changes through real hooks. Reverting the preview builder or
+removing only the comparison makes the adversarial test fail; restoring the
+implementation makes it pass.
+
 The seeded state test runs 500 random operation sequences with seed
 `0x51a7e202`. It includes native TOON/JSON Markdown inputs, whitespace/CRLF
 variants, replayed older documents and revision requests, relationships and all
@@ -35,8 +46,8 @@ is removed, and when snapshot isolation is removed. Restoring each implementatio
 returns the test to green. The third revert exposes SDK cache writes, rather than
 only checking item text.
 
-The pinned development SDK stays at 2026.10.20. The peer/manifest minimum now
-matches that SDK because the repair path uses its structured planner and semantic
-preview APIs. Full release checks run in CI through npm on Node 22 and 26 and
+The development SDK stays pinned to 2026.11.4. The peer/manifest minimum is
+2026.11.2 because repair policy uses the SDK settings-section reader alongside
+the structured planner and semantic preview APIs. Full release checks run in CI through npm on Node 22 and 26 and
 through Bun on Node 26, with the existing 100/100/100/100 and zero-duplication
 thresholds unchanged. CI receipts are linked from the pull request.

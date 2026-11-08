@@ -256,6 +256,37 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
     await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
+    // Shipped repair code must reject a real hook changing policy inside its disposable snapshot.
+    await writeFile(join(cwd, 'repair-policy-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const path = resolve('.agents/pm/settings.json');
+const before = await readFile(path, 'utf8');
+const settings = JSON.parse(before);
+const policies = [undefined, {}, { disable: ['PML002'] }, { rules: { PML003: { severity: 'info' } } }];
+try {
+  for (let index = 0; index < policies.length; index++) {
+    await writeFile(path, JSON.stringify({ ...settings, lint: policies[index] }));
+    const replacement = policies[(index + 1) % policies.length];
+    let observed = false;
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-policy-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      if (context.path.endsWith('settings.json')) {
+        observed = true;
+        await writeFile(context.path, JSON.stringify({ ...settings, lint: replacement }));
+      }
+    } }] });
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    assert.equal(observed, true);
+    assert.equal(await readFile(path, 'utf8'), JSON.stringify({ ...settings, lint: policies[index] }));
+    clearActiveExtensionHooks();
+  }
+} finally { clearActiveExtensionHooks(); await writeFile(path, before); }
+console.log('packed-repair-policy-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-policy-sdk.mjs'], pmRoot), /packed-repair-policy-bound-ok/);
     // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
     const state = join(cwd, 'lint.local.json');
     const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);
