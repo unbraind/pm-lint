@@ -15,7 +15,12 @@ must match that fingerprint and the captured lint section before core reads.
 Settings sections use semantic equality to preserve independent sibling settings;
 when a schema file aliases `settings.json`, its entire pre-hook bytes are also
 bound at the private handoff. All schema sections and SDK-normalized path aliases
-(including whitespace and `..`) follow this rule. All other retained inputs use
+(including whitespace and `..`) follow this rule. Alias detection resolves file
+identities before hooks run, so case-insensitive spellings and hard links cannot
+escape the byte fence. Real same-inode aliases with varied spelling exercise this
+rule on case-sensitive test volumes too. The excluded-state guard applies the
+same trimming before comparison, including direct padded paths, `.` and `..`,
+for all schema sections and all six excluded directories. All other retained inputs use
 byte equality. The SDK-loaded effective schema also binds
 the plan key, so schema policy changes cannot reuse an older plan identity.
 Audit history and equivalent schema formatting do not alter plan identity.
@@ -33,7 +38,12 @@ write returns `stale_revision` without a patch. Real asynchronous SDK read hooks
 absent/present sections, every built-in rule, severity, scopes and parameters
 through the API and command handler; refusal receipts round trip through JSON
 and TOON. Equivalent object-key ordering and independent settings remain valid,
-and the source tracker stays byte-identical. Packed Node and native Bun consumers
+and the source tracker stays byte-identical. Hook-introduced malformed documents
+and invalid policy return stale receipts through API and JSON/TOON commands;
+previously invalid documents retain their SDK refusal, even if hooks change their
+bytes. The adversarial corpus covers all rule controls and both invalid-document
+classes, plus unchanged SDK errors and native I/O failures. Packed Node
+and native Bun consumers repeat invalidation and same-inode alias checks. Packed Node and native Bun consumers
 also inject policy, aliased settings/schema and schema-only changes through real
 hooks, and check semantic schema replay and custom terminal-done questions.
 The regression corpus includes 32 seeded recursive object permutations for each of file and inline schemas, array

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { chmod, cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, cp, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { RepairRefusal } from './repairs.ts';
 
 /** Operational state and executable extensions are foreign to an observational authoring snapshot. */
@@ -54,4 +54,18 @@ async function writableDirectories(root: string): Promise<void> {
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (entry.isDirectory()) await writableDirectories(join(root, entry.name));
   }
+}
+
+/** Bind settings used as schema by file identity, including case aliases and hard links. */
+export async function schemaUsesSettings(root: string, files: readonly unknown[]): Promise<boolean> {
+  const settingsPath = join(root, 'settings.json');
+  const settings = await stat(settingsPath, { bigint: true });
+  for (const file of files) {
+    if (typeof file !== 'string') continue;
+    const path = resolve(root, file.trim());
+    if (path === settingsPath) return true;
+    const candidate = await stat(path, { bigint: true }).catch(/** Missing or unusable references are refused by the guarded schema loader. */ () => null);
+    if (candidate !== null && candidate.dev === settings.dev && candidate.ino === settings.ino) return true;
+  }
+  return false;
 }

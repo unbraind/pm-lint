@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { encode, decode } from '@toon-format/toon';
 import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
-import { chmod, mkdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, readSettings, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, isPmCliExpectedError, readSettings, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -14,6 +14,7 @@ import type { RepairBoundary, RepairRequest } from '../index.ts';
 import { mechanicalRepairs } from '../src/repairs.ts';
 import { runRepairCommand } from '../src/repair-command.ts';
 import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
+import { schemaUsesSettings } from '../src/repair-snapshot.ts';
 import { RULES } from '../src/rules.ts';
 
 /** Verify all refusal transport fields without dropping either renderer round trip. */
@@ -70,6 +71,73 @@ test('every repair policy must equal the settings policy bound into its plan dig
       assert.equal(await inventory(pmRoot), before);
     } finally { clearActiveExtensionHooks(); }
   }
+});
+
+/** Every malformed document and invalid policy introduced by a hook yields the same stale receipt. */
+test('repair read errors distinguish hook invalidation from existing invalid settings', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Classify every invalidated settings read', type: 'Task' })).item;
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const malformed = ['{', 'null', '[]', '42', '"text"'];
+  const invalid = [null, [], 'bad', { typo: true }, { failOn: 'fatal' }, ...RULES.flatMap(rule => [
+    { disable: [rule.code + 'typo'] }, { rules: { [rule.code]: { enabled: 'true' } } },
+    { rules: { [rule.code]: { severity: 'fatal' } } }, { rules: { [rule.code]: { scope: 'sometimes' } } },
+    { rules: { [rule.code]: { parameters: { typo: 0 } } } },
+  ])].map(lint => JSON.stringify({ ...settings, lint }));
+  t.after(clearActiveExtensionHooks);
+  for (const bytes of [...malformed, ...invalid]) {
+    await writeFile(path, JSON.stringify(settings));
+    const before = await inventory(pmRoot);
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'invalidate-settings', run: async context => {
+      assert.notEqual(context.path, path);
+      await writeFile(context.path, bytes);
+    } }] });
+    try { await assertBoundRepairRefusal(pmRoot, item.id, before); }
+    finally { clearActiveExtensionHooks(); }
+    // Previously persisted invalid documents remain typed SDK refusals, even if hooks edit their bytes.
+    await writeFile(path, bytes);
+    const code = malformed.includes(bytes) ? 'settings_section_document_malformed' : 'settings_section_invalid';
+    for (const change of [false, true]) {
+      setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'existing-invalid-settings', run: async context => {
+        if (change) await writeFile(context.path, bytes + ' ');
+      } }] });
+      try {
+        for (const read of [() => previewAuthoringRepairs(pmRoot, { id: item.id }), () => runRepairCommand({ command: 'lint repair', args: [], options: { id: item.id }, pm_root: pmRoot, global: {} })]) {
+          await assert.rejects(read(), error => isPmCliExpectedError(error) && error.code === code && error.exitCode === 2, `${code}: ${bytes}: changed=${change}`);
+        }
+      } finally { clearActiveExtensionHooks(); }
+    }
+  }
+  // Non-section I/O failures retain their native code rather than being mislabeled stale.
+  await writeFile(path, JSON.stringify(settings));
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'unreadable-settings', run: async context => {
+    await unlink(context.path);
+    await mkdir(context.path);
+  } }] });
+  try { await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), { code: 'EISDIR' }); }
+  finally { clearActiveExtensionHooks(); }
+  await unlink(path);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'missing-to-invalid', run: async context => { await writeFile(context.path, '{'); } }] });
+  try { await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), error => isPmCliExpectedError(error) && error.code === 'settings_section_document_malformed'); }
+  finally { clearActiveExtensionHooks(); }
+});
+
+/** Real same-inode aliases exercise the identity rule even on a case-sensitive test volume. */
+test('repair schema aliases compare file identities independently of path spelling', async t => {
+  const { pmRoot } = await tracker(t);
+  const path = getSettingsPath(pmRoot);
+  for (const alias of ['SETTINGS.JSON', 'Settings.Json', 'schema/settings-alias.json']) {
+    // Case-insensitive volumes already expose these aliases; never replace the canonical file.
+    if (await stat(join(pmRoot, alias)).catch(() => null) === null) await link(path, join(pmRoot, alias));
+    for (const spelling of [alias, './' + alias, ' schema/../' + alias + ' ']) {
+      assert.equal(await schemaUsesSettings(pmRoot, [null, 42, 'schema/fields.json', spelling]), true, spelling);
+    }
+  }
+  await writeFile(join(pmRoot, 'settings-copy.json'), await readFile(path));
+  assert.equal(await schemaUsesSettings(pmRoot, ['settings-copy.json', 'missing.json', null, 1]), false);
+  assert.equal(await schemaUsesSettings(pmRoot, []), false);
+  for (const spelling of ['settings.json', './settings.json', ' schema/../settings.json ']) assert.equal(await schemaUsesSettings(pmRoot, [spelling]), true);
 });
 
 /** Every retained schema path must keep its pre-hook bytes, not just its settings reference. */
@@ -658,8 +726,8 @@ test('referenced schema cannot be silently dropped with excluded foreign operati
     await mkdir(join(pmRoot, name), { recursive: true });
     const file = join(pmRoot, name, 'fields.json');
     await writeFile(file, '{"fields":[]}');
-    for (const reference of [`schema/../${name}/fields.json`, ` schema/../${name}/fields.json `]) {
-      settings.schema = { files: { fields: reference } };
+    for (const section of ['types', 'statuses', 'fields', 'workflows']) for (const reference of [`${name}/fields.json`, ` ${name}/fields.json `, `\t./${name}/fields.json \n`, `schema/../${name}/fields.json`, ` schema/../${name}/fields.json `]) {
+      settings.schema = { files: { [section]: reference } };
       await writeFile(path, JSON.stringify(settings));
       await unchangedRefusal(pmRoot, item.id);
       assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');

@@ -272,9 +272,10 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
     // The exact packed SDK preserves authoritative inputs, semantic replay and custom lifecycle roles.
     await writeFile(join(cwd, 'repair-schema-contract.mjs'), `import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { link, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { schemaUsesSettings } from '@unbrained/pm-lint/dist/src/repair-snapshot.js';
 import { PmClient, getItemPath, serializeItemDocument, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 const root = resolve('.agents/pm');
 const path = resolve(root, 'settings.json');
@@ -288,6 +289,13 @@ const item = (await client.get(${JSON.stringify(created.id)}, { full: true })).i
 const itemPath = getItemPath(root, item.type, item.id);
 const itemBytes = await readFile(itemPath, 'utf8');
 try {
+  for (const alias of ['SETTINGS.JSON', 'Settings.Json']) {
+    const target = resolve(root, alias);
+    const createdAlias = await stat(target).catch(() => null) === null;
+    if (createdAlias) await link(path, target);
+    try { assert.equal(await schemaUsesSettings(root, [' schema/../' + alias + ' ']), true); }
+    finally { if (createdAlias) await unlink(target); }
+  }
   const settings = { ...JSON.parse(original), schema: { files: { fields: ' schema/../settings.json ' } }, fields: [] };
   await writeFile(path, JSON.stringify(settings));
   setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-schema-alias', run: async context => {
@@ -297,6 +305,12 @@ try {
   await assert.rejects(previewAuthoringRepairs(root, { id: item.id }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
   assert.equal(await readFile(path, 'utf8'), JSON.stringify(settings));
   clearActiveExtensionHooks();
+  for (const directory of ['runtime', 'locks', 'extensions', 'transactions', 'checkpoints', 'search']) for (const section of ['types', 'statuses', 'fields', 'workflows']) {
+    const bytes = JSON.stringify({ ...JSON.parse(original), schema: { files: { [section]: ' ' + directory + '/repair-excluded-schema.json ' } } });
+    await writeFile(path, bytes);
+    await assert.rejects(previewAuthoringRepairs(root, { id: item.id }), error => error instanceof RepairRefusal && error.code === 'unsafe_repair');
+    assert.equal(await readFile(path, 'utf8'), bytes);
+  }
   await writeFile(path, original);
   const left = { type: 'string', enum: ['one', 'two'] };
   const right = { type: 'number' };
@@ -338,7 +352,7 @@ console.log('packed-repair-schema-contract-ok');
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
-import { setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+import { isPmCliExpectedError, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 const path = resolve('.agents/pm/settings.json');
 const before = await readFile(path, 'utf8');
 const settings = JSON.parse(before);
@@ -359,6 +373,18 @@ try {
     assert.equal(observed, true);
     assert.equal(await readFile(path, 'utf8'), JSON.stringify({ ...settings, lint: policies[index] }));
     clearActiveExtensionHooks();
+  }
+  for (const bytes of ['{', 'null', '[]', JSON.stringify({ ...settings, lint: { failOn: 'fatal' } }), JSON.stringify({ ...settings, lint: null })]) {
+    await writeFile(path, before);
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-invalid-policy-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      await writeFile(context.path, bytes);
+    } }] });
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    clearActiveExtensionHooks();
+    assert.equal(await readFile(path, 'utf8'), before);
+    await writeFile(path, bytes);
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => isPmCliExpectedError(error) && ['settings_section_invalid', 'settings_section_document_malformed'].includes(error.code));
   }
 } finally { clearActiveExtensionHooks(); await writeFile(path, before); }
 console.log('packed-repair-policy-bound-ok');

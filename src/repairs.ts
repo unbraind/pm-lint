@@ -2,9 +2,9 @@ import { decode } from '@toon-format/toon';
 import { createHash, randomUUID } from 'node:crypto';
 import { relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, resolveRuntimeStatusRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, getSettingsPath, isPmCliExpectedError, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, resolveRuntimeStatusRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
-import { fingerprint, REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
+import { fingerprint, REPAIR_EXCLUDED_STATE, schemaUsesSettings, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
 import { lintCorpus } from './engine.ts';
 import { objectValue, readLintSettings, resolveConfig } from './settings.ts';
@@ -135,17 +135,24 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   const settings = await readFileIfExists(getSettingsPath(pmRoot));
   // Bind every retained input, including default/custom schema paths and absent files, before hooks.
   const retainedFiles = await fingerprint(pmRoot, true);
-  const lintSettings = await readLintSettings(pmRoot);
+  let document: Record<string, unknown> | undefined;
+  try { document = objectValue(JSON.parse(settings ?? 'null')); } catch { /* Preserve the SDK's typed document refusal below. */ }
+  const schema = document?.schema as Partial<PmSettings['schema']> | undefined;
+  const schemaFiles = Object.values(schema?.files ?? {});
+  // Resolve identities before hooks can replace either file or its schema references.
+  const settingsIsSchema = document !== undefined && await schemaUsesSettings(pmRoot, schemaFiles);
+  let lintSettings: unknown;
+  try { lintSettings = await readLintSettings(pmRoot); } catch (error) {
+    if (document === undefined || !isPmCliExpectedError(error)) throw error;
+    // Reuse the write/read policy validator; pre-existing invalid policy keeps its SDK error.
+    try { resolveConfig(document.lint); } catch { throw error; }
+    // A typed section refusal after a valid capture proves the hook invalidated its document or policy.
+    throw staleRevision();
+  }
   const config = resolveConfig(lintSettings);
   await options.onBoundary?.('settings_read');
   if (settings === null) throw new RepairRefusal('unsafe_repair', 'Tracker settings are missing.', 'Restore settings.json before requesting a preview.');
-  // Guard references before readSettings can bootstrap schema files outside the disposable root.
-  let document: Record<string, unknown>;
-  try { document = objectValue(JSON.parse(settings)); } catch { throw staleRevision(); }
-  const schema = document.schema as Partial<PmSettings['schema']> | undefined;
-  const schemaFiles = Object.values(schema?.files ?? {});
-  // Settings may also supply schema: bind its complete captured bytes in that case.
-  const settingsIsSchema = schemaFiles.some(/** Normalize aliases exactly as SDK schema paths do. */ file => typeof file === 'string' && resolve(pmRoot, file.trim()) === getSettingsPath(pmRoot));
+  if (document === undefined) throw staleRevision();
   // SDK read hooks may change the snapshot: never certify questions under different policy bytes.
   if (!isDeepStrictEqual(lintSettings, document.lint)) throw staleRevision();
   // Hooks know the first snapshot path and may have scheduled deferred writes.
@@ -159,7 +166,7 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
     // Disable hooks throughout every core read in the private snapshot, including staging.
     return runWithActiveExtensions({ path: boundRoot, noExtensions: true }, async () => {
       await options.onBoundary?.('settings_bound');
-      if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(boundRoot, resolve(boundRoot, file)).split(sep)[0]))) {
+      if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(boundRoot, resolve(boundRoot, file.trim())).split(sep)[0]))) {
         throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
       }
       let schemaContext: Awaited<ReturnType<typeof loadGuardedRuntimeSchema>>;
