@@ -135,8 +135,9 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   // Raw bytes remain necessary for the snapshot digest and pre-bootstrap schema fence.
   const settings = await readFileIfExists(getSettingsPath(pmRoot));
   await options.onBoundary?.('settings_read');
+  if (settings === null) throw new RepairRefusal('unsafe_repair', 'Tracker settings are missing.', 'Restore settings.json before requesting a preview.');
   // Guard references before readSettings can bootstrap schema files outside the disposable root.
-  const schema = (JSON.parse(settings!) as { schema?: Partial<PmSettings['schema']> }).schema;
+  const schema = (JSON.parse(settings) as { schema?: Partial<PmSettings['schema']> }).schema;
   const schemaFiles = Object.values(schema?.files ?? {});
   if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(pmRoot, resolve(pmRoot, file)).split(sep)[0]))) {
     throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');

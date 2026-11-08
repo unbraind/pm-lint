@@ -5,9 +5,11 @@ import { getSettingsPath, isPmCliExpectedError, readSettingsSection, writeSettin
 import { createExtensionTestHarness } from '@unbrained/pm-cli/sdk/testing';
 import extension from '../index.ts';
 import { lintItems } from '../src/engine.ts';
-import { previewAuthoringRepairs } from '../src/repairs.ts';
+import { previewAuthoringRepairs, RepairRefusal } from '../src/repairs.ts';
+import type { RepairBoundary } from '../src/repairs.ts';
 import { objectValue, readLintSettings, resolveConfig, ruleCode, RULE_SCOPES, scopeValue, severityValue } from '../src/settings.ts';
 import { tracker } from './helpers.ts';
+import { inventory } from './repair-inventory.ts';
 
 /** Verify defaults, per-rule policy, explicit selections and severity overrides. */
 test('settings precedence is defaults, persisted rules, then explicit CLI flags', () => {
@@ -62,8 +64,16 @@ test('missing settings documents keep section defaults but refuse lint and repai
   assert.equal(await readLintSettings(pmRoot), undefined);
   await assert.rejects(lintItems(client, pmRoot));
   await assert.rejects(readFile(path), { code: 'ENOENT' });
-  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }));
+  const before = await inventory(pmRoot);
+  const boundaries: RepairBoundary[] = [];
+  const refusal = { code: 'unsafe_repair', message: 'Tracker settings are missing.', remedy: 'Restore settings.json before requesting a preview.' };
+  await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async boundary => { boundaries.push(boundary); } }), error => error instanceof RepairRefusal && error.code === refusal.code && error.message === refusal.message && error.remedy === refusal.remedy);
+  assert.deepEqual(boundaries, ['snapshot_read', 'settings_read']);
+  const harness = await createExtensionTestHarness(extension, { capabilities: ['commands', 'schema'] });
+  const command = await harness.runCommand({ command: 'lint repair', pmRoot, options: { id: item.id } });
+  assert.deepEqual(command.result, { ok: false, refusal, writes: 0, exit_code: 2 });
   await assert.rejects(readFile(path), { code: 'ENOENT' });
+  assert.equal(await inventory(pmRoot), before);
 });
 
 /** Preserve policy parity and independent core/sibling data in a real non-git tracker. */
