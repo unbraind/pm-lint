@@ -13,9 +13,16 @@ Before any read hook runs, the preview fingerprints every retained file name and
 byte (including default/custom schema paths and absent files). The private copy
 must match that fingerprint and the captured lint section before core reads.
 Settings sections use semantic equality to preserve independent sibling settings;
-all other retained inputs use byte equality. The SDK-loaded effective schema also binds
+when a schema file aliases `settings.json`, its entire pre-hook bytes are also
+bound at the private handoff. All schema sections and SDK-normalized path aliases
+(including whitespace and `..`) follow this rule. All other retained inputs use
+byte equality. The SDK-loaded effective schema also binds
 the plan key, so schema policy changes cannot reuse an older plan identity.
 Audit history and equivalent schema formatting do not alter plan identity.
+Schema and parsed settings hashing reuse the recursive canonical JSON digest, so object-key
+permutations at any depth preserve replay identity while array order stays bound.
+Repair questions use the status registry resolved from this same private schema;
+custom lifecycle names retain built-in active, blocked and terminal semantics.
 After the initial section read, a second stability-checked snapshot hides the
 core-read root from hooks that may have scheduled deferred writes to the first
 snapshot. All schema reads, planning and validation run against that private
@@ -27,7 +34,11 @@ absent/present sections, every built-in rule, severity, scopes and parameters
 through the API and command handler; refusal receipts round trip through JSON
 and TOON. Equivalent object-key ordering and independent settings remain valid,
 and the source tracker stays byte-identical. Packed Node and native Bun consumers
-also inject policy and schema-only changes through real hooks. A generated
+also inject policy, aliased settings/schema and schema-only changes through real
+hooks, and check semantic schema replay and custom terminal-done questions.
+The regression corpus includes 32 seeded recursive object permutations for each of file and inline schemas, array
+reordering, every schema-section alias at both handoffs, and 15 renamed lifecycle
+cases through SDK and actual non-git CLI JSON/TOON output. A generated
 core-key matrix checks refusals before source reads, and separate cases cover
 removed/malformed settings and late hooks through mechanical validation. Reverting the preview builder or
 removing only the comparison makes the adversarial test fail; restoring the

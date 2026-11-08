@@ -270,6 +270,69 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
     await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
+    // The exact packed SDK preserves authoritative inputs, semantic replay and custom lifecycle roles.
+    await writeFile(join(cwd, 'repair-schema-contract.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { PmClient, getItemPath, serializeItemDocument, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const root = resolve('.agents/pm');
+const path = resolve(root, 'settings.json');
+const fieldsPath = resolve(root, 'schema/fields.json');
+const statusesPath = resolve(root, 'schema/statuses.json');
+const original = await readFile(path, 'utf8');
+const fields = await readFile(fieldsPath, 'utf8');
+const statuses = await readFile(statusesPath, 'utf8');
+const client = new PmClient({ pmRoot: root, noExtensions: true });
+const item = (await client.get(${JSON.stringify(created.id)}, { full: true })).item;
+const itemPath = getItemPath(root, item.type, item.id);
+const itemBytes = await readFile(itemPath, 'utf8');
+try {
+  const settings = { ...JSON.parse(original), schema: { files: { fields: ' schema/../settings.json ' } }, fields: [] };
+  await writeFile(path, JSON.stringify(settings));
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-schema-alias', run: async context => {
+    assert.notEqual(context.path, path);
+    await writeFile(context.path, JSON.stringify({ ...settings, fields: [{ key: 'title', required: true }] }));
+  } }] });
+  await assert.rejects(previewAuthoringRepairs(root, { id: item.id }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+  assert.equal(await readFile(path, 'utf8'), JSON.stringify(settings));
+  clearActiveExtensionHooks();
+  await writeFile(path, original);
+  const left = { type: 'string', enum: ['one', 'two'] };
+  const right = { type: 'number' };
+  const field = properties => ({ fields: [{ key: 'payload', type: 'object', value_schema: { type: 'object', properties } }] });
+  await writeFile(fieldsPath, JSON.stringify(field({ left, right })));
+  const first = await previewAuthoringRepairs(root, { id: item.id });
+  await writeFile(fieldsPath, JSON.stringify(field({ right, left: { enum: left.enum, type: left.type } })));
+  assert.equal((await previewAuthoringRepairs(root, { id: item.id })).plan_key, first.plan_key);
+  left.enum.reverse();
+  await writeFile(fieldsPath, JSON.stringify(field({ left, right })));
+  assert.notEqual((await previewAuthoringRepairs(root, { id: item.id })).plan_key, first.plan_key);
+  await writeFile(fieldsPath, fields);
+  const inline = properties => ({ ...JSON.parse(original), schema: { fields: field(properties).fields } });
+  await writeFile(path, JSON.stringify(inline({ left, right })));
+  const inlineFirst = await previewAuthoringRepairs(root, { id: item.id });
+  await writeFile(path, JSON.stringify(inline({ right, left: { enum: left.enum, type: left.type } })));
+  assert.equal((await previewAuthoringRepairs(root, { id: item.id })).plan_key, inlineFirst.plan_key);
+  left.enum.reverse();
+  await writeFile(path, JSON.stringify(inline({ left, right })));
+  assert.notEqual((await previewAuthoringRepairs(root, { id: item.id })).plan_key, inlineFirst.plan_key);
+  await writeFile(path, original);
+  await writeFile(statusesPath, JSON.stringify({ statuses: [{ id: 'delivered', roles: ['terminal', 'terminal_done'] }] }));
+  await writeFile(itemPath, serializeItemDocument({ metadata: { ...item, status: 'delivered', resolution: undefined, acceptance_criteria: undefined }, body: '' }));
+  const questions = (await previewAuthoringRepairs(root, { id: item.id })).questions.map(row => row.code);
+  assert.ok(questions.includes('PML004'));
+  assert.ok(!questions.includes('PML002'));
+} finally {
+  clearActiveExtensionHooks();
+  await writeFile(path, original);
+  await writeFile(fieldsPath, fields);
+  await writeFile(statusesPath, statuses);
+  await writeFile(itemPath, itemBytes);
+}
+console.log('packed-repair-schema-contract-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-schema-contract.mjs'], pmRoot), /packed-repair-schema-contract-ok/);
     // Shipped repair code must reject a real hook changing policy inside its disposable snapshot.
     await writeFile(join(cwd, 'repair-policy-sdk.mjs'), `import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';

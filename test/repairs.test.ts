@@ -149,6 +149,118 @@ test('repair plan identity binds the effective schema independently of item revi
   assert.equal(await inventory(pmRoot), before);
 });
 
+/** Aliased schema files retain their full bytes even when the file also stores settings. */
+test('repair schema aliases bind settings bytes across every section and handoff', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Bind settings used as schema', type: 'Task' })).item;
+  await seed(pmRoot, item);
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  t.after(clearActiveExtensionHooks);
+  for (const section of ['types', 'statuses', 'fields', 'workflows']) {
+    for (const alias of ['settings.json', './settings.json', ' schema/../settings.json ']) {
+      const document = { ...settings, schema: { files: { [section]: alias } }, definitions: [], statuses: [], fields: [], workflow: {} };
+      await writeFile(path, JSON.stringify(document));
+      const before = await inventory(pmRoot);
+      assert.equal((await previewAuthoringRepairs(pmRoot, { id: item.id })).validation?.validated, true, `${section}: ${alias}`);
+      assert.equal(await inventory(pmRoot), before);
+      let exposed = '';
+      for (const deferred of [false, true]) {
+        setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'aliased-schema-edit', run: async context => {
+          exposed = context.path;
+          if (!deferred) await writeFile(exposed, JSON.stringify({ ...document, schema_note: 'changed schema bytes' }));
+        } }] });
+        try {
+          if (deferred) await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
+            if (step === 'settings_read') await writeFile(exposed, JSON.stringify({ ...document, fields: [{ key: 'title', required: true }] }));
+          } }), refusal('stale_revision'));
+          else await assertBoundRepairRefusal(pmRoot, item.id, before);
+          assert.equal(await inventory(pmRoot), before);
+        } finally { clearActiveExtensionHooks(); }
+      }
+    }
+  }
+});
+
+/** Recursive object permutations preserve semantic identity; ordered schema arrays remain bound. */
+test('repair schema identity ignores all object key permutations and preserves array order', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Preserve semantic schema replay', type: 'Task' })).item;
+  await seed(pmRoot, item);
+  const path = join(pmRoot, 'schema', 'fields.json');
+  const field = { key: 'payload', type: 'object', value_schema: { type: 'object', properties: { alpha: { type: 'string', enum: ['first', 'second'] }, beta: { type: 'object', properties: { left: { type: 'string' }, right: { type: 'number' } } } } } };
+  const settingsPath = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
+  let state = 0x6a09e667;
+  /** Shuffle every object independently, leaving primitive values and array positions untouched. */
+  function permute(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(permute);
+    if (value === null || typeof value !== 'object') return value;
+    const entries = Object.entries(value);
+    for (let index = entries.length - 1; index > 0; index--) {
+      state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+      const other = (state >>> 0) % (index + 1);
+      [entries[index], entries[other]] = [entries[other], entries[index]];
+    }
+    return Object.fromEntries(entries.map(([key, entry]) => [key, permute(entry)]));
+  }
+  for (const inline of [false, true]) {
+    await writeFile(path, '{"fields":[]}');
+    /** Feed the identical schema corpus through both supported configuration sources. */
+    async function writeSchema(value: unknown): Promise<void> {
+      if (inline) await writeFile(settingsPath, JSON.stringify({ ...settings, schema: { fields: (value as { fields: unknown[] }).fields } }));
+      else await writeFile(path, JSON.stringify(value));
+    }
+    await writeSchema({ fields: [field] });
+    const expected = await previewAuthoringRepairs(pmRoot, { id: item.id });
+    for (let index = 0; index < 32; index++) {
+      await writeSchema(permute({ fields: [field] }));
+      const receipt = await previewAuthoringRepairs(pmRoot, { id: item.id, revision: expected.revision });
+      assert.equal(receipt.plan_key, expected.plan_key, `inline=${inline} permutation=${index}`);
+      assert.deepEqual(decode(encode(receipt)), receipt);
+      const command = await runRepairCommand({ command: 'lint repair', args: [], options: { id: item.id }, pm_root: pmRoot, global: {} });
+      assert.equal(command.plan_key, expected.plan_key);
+    }
+    field.value_schema.properties.alpha.enum.reverse();
+    await writeSchema({ fields: [field] });
+    assert.notEqual((await previewAuthoringRepairs(pmRoot, { id: item.id })).plan_key, expected.plan_key);
+  }
+});
+
+/** Every lifecycle role must retain its meaning across built-in and renamed native statuses. */
+test('repair questions preserve every configured lifecycle role across SDK and CLI renderers', async t => {
+  const { client, root, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'TODO', type: 'Task' })).item;
+  await installBuiltExtension(pmRoot);
+  const roles = [['active', 'default_open'], ['active'], ['blocked'], ['terminal', 'terminal_done'], ['terminal', 'terminal_canceled']];
+  const builtins = ['open', 'in_progress', 'blocked', 'closed', 'canceled'];
+  const expected: string[][] = [];
+  for (const status of builtins) {
+    await writeFile(getItemPath(pmRoot, item.type, item.id), serializeItemDocument({ metadata: { ...item, status: status as ItemMetadata['status'] }, body: '' }));
+    expected.push((await previewAuthoringRepairs(pmRoot, { id: item.id })).questions.map(row => row.code));
+  }
+  assert.ok(expected[3].includes('PML004'));
+  assert.ok(!expected[3].includes('PML002'));
+  for (let sequence = 0; sequence < 3; sequence++) {
+    const names = roles.map((_, index) => `custom_${sequence}_${index}`);
+    await writeFile(join(pmRoot, 'schema', 'statuses.json'), JSON.stringify({ statuses: names.map((id, index) => ({ id, roles: roles[index] })) }));
+    for (let index = 0; index < names.length; index++) {
+      await writeFile(getItemPath(pmRoot, item.type, item.id), serializeItemDocument({ metadata: { ...item, status: names[index] as ItemMetadata['status'] }, body: '' }));
+      const before = await inventory(pmRoot);
+      const result = await previewAuthoringRepairs(pmRoot, { id: item.id });
+      assert.deepEqual(result.questions.map(row => row.code), expected[index]);
+      for (const json of [false, true]) {
+        const cli = runGitFreeCli(root, pmRoot, ['lint', 'repair', '--id', item.id, ...(json ? ['--json'] : [])]);
+        assert.equal(cli.status, 0, cli.stderr);
+        const output = (json ? JSON.parse(cli.stdout) : decode(cli.stdout)) as { questions?: { code: string }[] };
+        // The host omits empty collections in compact TOON output.
+        assert.deepEqual((output.questions ?? []).map(row => row.code), expected[index]);
+      }
+      assert.equal(await inventory(pmRoot), before);
+    }
+  }
+});
+
 /** A section validated earlier cannot silently drift while copying into the private snapshot. */
 test('repair copied lint policy must match every captured policy after the section read', async t => {
   const { client, pmRoot } = await tracker(t);
@@ -546,10 +658,12 @@ test('referenced schema cannot be silently dropped with excluded foreign operati
     await mkdir(join(pmRoot, name), { recursive: true });
     const file = join(pmRoot, name, 'fields.json');
     await writeFile(file, '{"fields":[]}');
-    settings.schema = { files: { fields: `schema/../${name}/fields.json` } };
-    await writeFile(path, JSON.stringify(settings));
-    await unchangedRefusal(pmRoot, item.id);
-    assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
+    for (const reference of [`schema/../${name}/fields.json`, ` schema/../${name}/fields.json `]) {
+      settings.schema = { files: { fields: reference } };
+      await writeFile(path, JSON.stringify(settings));
+      await unchangedRefusal(pmRoot, item.id);
+      assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
+    }
   }
 });
 

@@ -2,7 +2,7 @@ import { decode } from '@toon-format/toon';
 import { createHash, randomUUID } from 'node:crypto';
 import { relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, getSettingsPath, loadGuardedRuntimeSchema, locateItem, readSettings, resolveItemTypeRegistry, resolveRuntimeStatusRegistry, runWithActiveExtensions, splitFrontMatter, planItemMutationDocument, previewItemMutations, readFileIfExists, toImportTags, toNonEmptyImportString } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata, ItemMutationPreviewValidation, PmCompleteListResult, PmSettings } from '@unbrained/pm-cli/sdk';
 import { fingerprint, REPAIR_EXCLUDED_STATE, withRepairSnapshot } from './repair-snapshot.ts';
 import { sourceDigest } from './baseline.ts';
@@ -110,9 +110,9 @@ function assertRequest(request: RepairRequest): void {
 }
 
 /** Hash all certified context so concurrent peer edits cannot silently change relationship-dependent questions. */
-function contextRevision(source: PmCompleteListResult, settings: string | null, schema: unknown): string {
+function contextRevision(source: PmCompleteListResult, settings: Record<string, unknown>, schema: unknown): string {
   const items = certifyCompleteListResult(source).items.map(/** Bind all native fields, not just the proposed patch content. */ item => [item.id, sourceDigest(item)]).sort(/** Canonical ids make scan ordering irrelevant. */ (left, right) => left[0].localeCompare(right[0]));
-  return createHash('sha256').update(JSON.stringify([items, settings, schema])).digest('hex');
+  return sourceDigest([items, settings, schema]);
 }
 
 /** Read boundaries available to deterministic interleaving tests and observational instrumentation. */
@@ -142,20 +142,23 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
   // Guard references before readSettings can bootstrap schema files outside the disposable root.
   let document: Record<string, unknown>;
   try { document = objectValue(JSON.parse(settings)); } catch { throw staleRevision(); }
+  const schema = document.schema as Partial<PmSettings['schema']> | undefined;
+  const schemaFiles = Object.values(schema?.files ?? {});
+  // Settings may also supply schema: bind its complete captured bytes in that case.
+  const settingsIsSchema = schemaFiles.some(/** Normalize aliases exactly as SDK schema paths do. */ file => typeof file === 'string' && resolve(pmRoot, file.trim()) === getSettingsPath(pmRoot));
   // SDK read hooks may change the snapshot: never certify questions under different policy bytes.
   if (!isDeepStrictEqual(lintSettings, document.lint)) throw staleRevision();
   // Hooks know the first snapshot path and may have scheduled deferred writes.
   // Copy into an unexposed snapshot before any core read; no hook learns this root.
   return withRepairSnapshot(pmRoot, async boundRoot => {
     // Recheck the copied document before schema loading can follow changed references.
+    const observedSettings = await readFileIfExists(getSettingsPath(boundRoot));
     let observed: Record<string, unknown>;
-    try { observed = objectValue(JSON.parse((await readFileIfExists(getSettingsPath(boundRoot))) ?? 'null')); } catch { throw staleRevision(); }
-    if (!isDeepStrictEqual(document.schema, observed.schema) || !isDeepStrictEqual(document.lint, observed.lint) || await fingerprint(boundRoot, true) !== retainedFiles) throw staleRevision();
+    try { observed = objectValue(JSON.parse(observedSettings ?? 'null')); } catch { throw staleRevision(); }
+    if ((settingsIsSchema && settings !== observedSettings) || !isDeepStrictEqual(document.schema, observed.schema) || !isDeepStrictEqual(document.lint, observed.lint) || await fingerprint(boundRoot, true) !== retainedFiles) throw staleRevision();
     // Disable hooks throughout every core read in the private snapshot, including staging.
     return runWithActiveExtensions({ path: boundRoot, noExtensions: true }, async () => {
       await options.onBoundary?.('settings_bound');
-      const schema = document.schema as Partial<PmSettings['schema']> | undefined;
-      const schemaFiles = Object.values(schema?.files ?? {});
       if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(boundRoot, resolve(boundRoot, file)).split(sep)[0]))) {
         throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
       }
@@ -178,11 +181,11 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
       await options.onBoundary?.('source_read');
       const revision = createHash('sha256').update(JSON.stringify([sourceDigest(item), raw])).digest('hex');
       if (request.revision !== undefined && request.revision !== revision) throw staleRevision();
-      const context = contextRevision(source, settings, schemaContext);
+      const context = contextRevision(source, document, schemaContext);
       const original = located!.item_format === 'toon' ? decode(raw!) : JSON.parse(splitFrontMatter(raw!).frontMatter) as unknown;
       const { findings, patch } = mechanicalRepairs(item, (original as Record<string, unknown>).tags);
       if (Buffer.byteLength(JSON.stringify(patch)) > 16384) throw new RepairRefusal('limit_exceeded', 'The mechanical patch exceeds 16 KiB.', 'Review this item directly with pm get --full; repair the oversized field explicitly.');
-      const questions: RepairQuestion[] = lintCorpus(source, config, { id: [item.id] }).findings.map(/** Existing diagnostics become questions without generating answers. */ finding => ({ code: finding.rule, field: finding.field, question: QUESTIONS[finding.rule] }));
+      const questions: RepairQuestion[] = lintCorpus(source, config, { id: [item.id] }, Date.now(), resolveRuntimeStatusRegistry(schemaContext.schema)).findings.map(/** Existing diagnostics become questions without generating answers. */ finding => ({ code: finding.rule, field: finding.field, question: QUESTIONS[finding.rule] }));
       if (item.type === 'Issue' && toNonEmptyImportString(item.expected_result) === undefined) questions.push({ code: 'missing_expected_behavior', field: 'expected_result', question: 'What should happen for the reported reproduction steps?' });
       const planKey = createHash('sha256').update(JSON.stringify([1, revision, context, patch])).digest('hex');
       let validation: ItemMutationPreviewValidation | null = null;

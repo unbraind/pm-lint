@@ -10,7 +10,7 @@ export const REPAIR_EXCLUDED_STATE: Readonly<Record<string, string>> = { runtime
 /** Resolve excluded root entries once for snapshot copying and fingerprints. */
 const SKIPPED = new Set(Object.keys(REPAIR_EXCLUDED_STATE));
 
-/** Bind retained file bytes and names; settings can be compared separately by semantic section. */
+/** Bind retained file bytes and names; callers omitting settings must separately bind its sections and any schema use. */
 export async function fingerprint(root: string, omitSettings = false): Promise<string> {
   const hash = createHash('sha256');
   /** Recurse only inside the selected tracker and refuse links or special files. */
