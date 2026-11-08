@@ -8,7 +8,8 @@ import { lintItems } from '../src/engine.ts';
 import { previewAuthoringRepairs, RepairRefusal } from '../src/repairs.ts';
 import type { RepairBoundary } from '../src/repairs.ts';
 import { objectValue, readLintSettings, resolveConfig, ruleCode, RULE_SCOPES, scopeValue, severityValue } from '../src/settings.ts';
-import { tracker } from './helpers.ts';
+import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
+import { decode } from '@toon-format/toon';
 import { inventory } from './repair-inventory.ts';
 
 /** Verify defaults, per-rule policy, explicit selections and severity overrides. */
@@ -101,6 +102,10 @@ test('SDK section reads share validated policy with the registered lint command'
   assert.equal(direct.exit_code, 1);
   const override = await harness.runCommand({ command: 'lint', pmRoot, options: { rule: ['PML001'], severity: 'error', failOn: 'error' } });
   assert.deepEqual(override.result, await lintItems(client, pmRoot, { rule: ['PML001'], severity: 'error', failOn: 'error' }));
+  const overridden = override.result as Awaited<ReturnType<typeof lintItems>>;
+  assert.deepEqual(overridden.findings.map(row => [row.item_id, row.rule, row.severity]), [[item.id, 'PML001', 'error']]);
+  assert.equal(overridden.fail_on, 'error');
+  assert.equal(overridden.exit_code, 1);
   assert.equal((await readSettingsSection(pmRoot, 'sibling')).value !== undefined, true);
   assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), before);
   // A CLI override must never hide invalid persisted policy. Each invalid value
@@ -130,5 +135,33 @@ test('SDK section reads give typed refusals for malformed settings documents', a
     await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }), refused);
     await assert.rejects(harness.runCommand({ command: 'lint', pmRoot }), refused);
     assert.equal(await readFile(getSettingsPath(pmRoot), 'utf8'), bytes);
+  }
+});
+
+/** Exhaust the severity/threshold domain against literal expected findings on every public transport. */
+test('explicit overrides defeat conflicting persisted settings on SDK and JSON/TOON commands without git', async t => {
+  const { client, pmRoot, root } = await tracker(t);
+  const item = (await client.create({ type: 'Task', title: 'Fix' })).item;
+  await installBuiltExtension(pmRoot);
+  const harness = await createExtensionTestHarness(extension, { capabilities: ['commands', 'schema'] });
+  const severities = ['info', 'warn', 'error'] as const;
+  for (const [rank, severity] of severities.entries()) for (const [threshold, failOn] of severities.entries()) {
+    await writeSettingsSection(pmRoot, 'lint', { disable: ['PML001'], failOn: severities[(threshold + 1) % 3], rules: { PML001: { severity: severities[(rank + 1) % 3] } } });
+    const options = { rule: ['PML001'], severity, failOn };
+    const direct = await lintItems(client, pmRoot, options);
+    const registered = (await harness.runCommand({ command: 'lint', pmRoot, options })).result;
+    const results: unknown[] = [direct, registered];
+    for (const format of ['json', 'toon']) {
+      const command = runGitFreeCli(root, pmRoot, [...(format === 'json' ? ['--json'] : []), 'lint', '--rule', 'PML001', '--severity', severity, '--fail-on', failOn]);
+      assert.equal(command.status, rank >= threshold ? 1 : 0, command.stderr);
+      results.push(format === 'json' ? JSON.parse(command.stdout) : decode(command.stdout));
+    }
+    for (const raw of results) {
+      const result = raw as Awaited<ReturnType<typeof lintItems>>;
+      assert.deepEqual(result.findings.map(row => [row.item_id, row.rule, row.severity]), [[item.id, 'PML001', severity]]);
+      assert.equal(result.fail_on, failOn);
+      assert.equal(result.count, 1);
+      assert.equal(result.exit_code ?? 0, rank >= threshold ? 1 : 0);
+    }
   }
 });

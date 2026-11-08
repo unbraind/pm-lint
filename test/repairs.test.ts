@@ -80,7 +80,7 @@ test('every core setting must match captured repair settings before schema-depen
     try {
       const boundaries: RepairBoundary[] = [];
       await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => { boundaries.push(step); } }), refusal('stale_revision'));
-      assert.deepEqual(boundaries, ['snapshot_read', 'settings_read']);
+      assert.deepEqual(boundaries, replacement.schema === settings.schema ? ['snapshot_read', 'settings_read', 'settings_bound'] : ['snapshot_read', 'settings_read']);
       await assertStaleRepairCommand(pmRoot, item.id);
       assert.equal(calls, 2);
       assert.equal(await inventory(pmRoot), before);
@@ -109,6 +109,47 @@ test('repair schema remains isolated from later SDK hooks through planning and v
   try {
     assertRepairReplay(await previewAuthoringRepairs(pmRoot, { id: item.id }), expected);
     assert.equal(calls, 1, 'only the initial SDK section read runs external hooks');
+    assert.equal(await inventory(pmRoot), before);
+  } finally { clearActiveExtensionHooks(); }
+});
+
+/** Deferred writers retain only the exposed root; even ABA edits cannot affect later core reads. */
+test('captured repair settings survive deferred ABA writes at every downstream boundary', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Keep captured repair configuration', type: 'Task' })).item;
+  await seed(pmRoot, item);
+  const expected = await previewAuthoringRepairs(pmRoot, { id: item.id });
+  const path = getSettingsPath(pmRoot);
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  const core = await readSettings(pmRoot);
+  const replacements = [{ ...settings, item_types: { definitions: [...core.item_types.definitions.filter(row => row.name !== item.type), { name: item.type, folder: 'alternate-items' }] } }, ...Object.keys(core).map(key => ({ ...settings, [key]: settings[key] === null ? false : null })), { ...settings, item_format: 'md' }, { ...settings, schema: { files: { fields: '../unfenced-fields.json' } } }];
+  const before = await inventory(pmRoot);
+  let exposedPath = '';
+  let exposedBytes = '';
+  t.after(clearActiveExtensionHooks);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'deferred-settings-writer', run: async context => {
+    assert.notEqual(context.path, path);
+    if (context.path.endsWith('settings.json')) { exposedPath = context.path; exposedBytes = await readFile(context.path, 'utf8'); }
+  } }] });
+  try {
+    const windows: [RepairBoundary, RepairBoundary][] = [['source_read', 'planned'], ['planned', 'validated'], ['validated', 'source_rechecked'], ['settings_bound', 'source_read']];
+    for (const replacement of replacements) for (const [change, restore] of windows) {
+      let changed = false;
+      let restored = false;
+      const result = await previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
+        if (step === change) { changed = true; await writeFile(exposedPath, JSON.stringify(replacement)); }
+        if (step === restore) { restored = true; await writeFile(exposedPath, exposedBytes); }
+      } });
+      assert.equal(changed && restored, true, `${change} ABA injection completed`);
+      assertRepairReplay(result, expected);
+      assert.deepEqual(decode(encode(result)), result);
+      assert.equal(await inventory(pmRoot), before);
+    }
+    t.diagnostic(`${replacements.length} core-setting variants across ${windows.length} downstream ABA windows`);
+    // A non-restored write still invalidates the receipt rather than publishing mixed evidence.
+    await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
+      if (step === 'planned') await writeFile(exposedPath, JSON.stringify({ ...settings, item_format: 'md' }));
+    } }), refusal('stale_revision'));
     assert.equal(await inventory(pmRoot), before);
   } finally { clearActiveExtensionHooks(); }
 });
@@ -242,7 +283,7 @@ test('requests, limits, core refusals and blank substantive titles stay explicit
 test('every asynchronous preview boundary rejects a competing target transition on one non-git tracker', async t => {
   const { client, pmRoot } = await tracker(t);
   const item = (await client.create({ title: 'Check every interleaving boundary', type: 'Task' })).item;
-  const boundaries: RepairBoundary[] = ['snapshot_read', 'settings_read', 'source_read', 'planned', 'validated', 'source_rechecked'];
+  const boundaries: RepairBoundary[] = ['snapshot_read', 'settings_read', 'settings_bound', 'source_read', 'planned', 'validated', 'source_rechecked'];
   for (const boundary of boundaries) {
     await seed(pmRoot, item);
     const saved = await previewAuthoringRepairs(pmRoot, { id: item.id });

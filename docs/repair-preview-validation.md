@@ -9,10 +9,13 @@ exposed read/plan/validation boundary.
 Repair plans compare the SDK-validated lint section with the section in their
 captured settings bytes before deriving questions. Schema settings and every
 core key recognized by the pinned SDK must also agree before plan generation.
-After the initial section read, the remaining schema reads, planning and
-validation run in an isolated SDK extension scope so later hooks cannot switch
-configuration, including change-and-restore interleavings. A mismatch returns
-`stale_revision` without a patch. Real asynchronous SDK read hooks exercise
+After the initial section read, a second stability-checked snapshot hides the
+core-read root from hooks that may have scheduled deferred writes to the first
+snapshot. All schema reads, planning and validation run against that private
+copy with extensions disabled. Core-key adversarial cases change and restore
+the exposed settings at every downstream boundary; the receipts must retain
+the captured plan and validation. Any captured-settings mismatch or non-restored
+write returns `stale_revision` without a patch. Real asynchronous SDK read hooks exercise
 absent/present sections, every built-in rule, severity, scopes and parameters
 through the API and command handler; refusal receipts round trip through JSON
 and TOON. Equivalent object-key ordering and independent settings remain valid,

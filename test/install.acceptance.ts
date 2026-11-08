@@ -5,6 +5,7 @@ import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile, readdir } from 'n
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { decode } from '@toon-format/toon';
 import { PmClient, certifyCompleteListResult, splitAcceptanceCriteria } from '@unbrained/pm-cli/sdk';
 
 /** One lint verdict as rendered by the packed extension command. */
@@ -165,6 +166,19 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.equal(restated?.excerpt, 'Weak context item', 'the restated description is excerpted');
     assert.ok(initial.verdict.findings.every(finding => typeof finding.excerpt === 'string' && finding.excerpt.length <= 160), 'excerpts stay bounded');
     assert.equal(initial.verdict.summary.PML002.error, initial.verdict.findings.filter(finding => finding.rule === 'PML002').length, 'the per-rule summary counts findings by severity');
+    // Literal packed-output assertions detect shared precedence bugs in either runtime.
+    const settingsPath = join(pmRoot, 'settings.json');
+    const originalSettings = await readFile(settingsPath, 'utf8');
+    try {
+      await writeFile(settingsPath, JSON.stringify({ ...JSON.parse(originalSettings), lint: { disable: ['PML002'], failOn: 'info', rules: { PML002: { severity: 'info' } } } }));
+      for (const format of ['json', 'toon']) {
+        const result = runConsumer(cwd, runner, [...prefix, ...(format === 'json' ? ['--json'] : []), 'lint', '--rule', 'PML002', '--severity', 'error', '--fail-on', 'error'], pmRoot);
+        const verdict = (format === 'json' ? JSON.parse(result.stdout) : decode(result.stdout)) as LintVerdict;
+        assert.deepEqual(verdict.findings.map(row => [row.item_id, row.rule, row.severity]), [[created.id, 'PML002', 'error']]);
+        assert.equal(verdict.fail_on, 'error');
+        assert.equal(result.status, 1);
+      }
+    } finally { await writeFile(settingsPath, originalSettings); }
     // The rule table read command lists the documented defaults and settings keys.
     const listing = rulesCommand(cwd, runner, prefix, pmRoot);
     assert.equal(listing.count, 10);
@@ -316,6 +330,40 @@ try {
 console.log('packed-repair-schema-bound-ok');
 `);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-schema-sdk.mjs'], pmRoot), /packed-repair-schema-bound-ok/);
+    // A hook's deferred ABA writes cannot reach the private planning/validation tracker.
+    await writeFile(join(cwd, 'repair-deferred-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs } from '@unbrained/pm-lint';
+import { PmClient, getItemPath, serializeItemDocument, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const client = new PmClient({ pmRoot: '.agents/pm', noExtensions: true });
+const item = (await client.get(${JSON.stringify(created.id)}, { full: true })).item;
+const itemPath = getItemPath(resolve('.agents/pm'), item.type, item.id);
+const original = await readFile(itemPath, 'utf8');
+let exposedPath;
+let exposedBytes;
+try {
+  await writeFile(itemPath, serializeItemDocument({ metadata: { ...item, title: '  Verify captured settings  ' }, body: '' }));
+  const expected = await previewAuthoringRepairs('.agents/pm', { id: item.id });
+  assert.equal(expected.validation.validated, true);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-deferred-writer', run: async context => {
+    if (context.path.endsWith('settings.json')) { exposedPath = context.path; exposedBytes = await readFile(context.path, 'utf8'); }
+  } }] });
+  for (const [change, restore] of [['source_read', 'planned'], ['planned', 'validated'], ['settings_bound', 'source_read']]) {
+    let restored = false;
+    const result = await previewAuthoringRepairs('.agents/pm', { id: item.id }, { onBoundary: async step => {
+      if (step === change) await writeFile(exposedPath, JSON.stringify({ ...JSON.parse(exposedBytes), item_format: 'md', item_types: { definitions: [{ name: item.type, folder: 'alternate-items' }] } }));
+      if (step === restore) { restored = true; await writeFile(exposedPath, exposedBytes); }
+    } });
+    assert.equal(restored, true);
+    assert.equal(result.plan_key, expected.plan_key);
+    assert.deepEqual(result.patch, expected.patch);
+    assert.equal(result.validation.validated, true);
+  }
+} finally { clearActiveExtensionHooks(); await writeFile(itemPath, original); }
+console.log('packed-deferred-settings-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-deferred-sdk.mjs'], pmRoot), /packed-deferred-settings-bound-ok/);
     // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
     const state = join(cwd, 'lint.local.json');
     const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);
