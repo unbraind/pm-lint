@@ -217,6 +217,23 @@ test('repair plan identity binds the effective schema independently of item revi
   assert.equal(await inventory(pmRoot), before);
 });
 
+/** Loader warnings are diagnostics; identical effective schemas share one plan identity. */
+test('repair plan identity excludes schema loader warnings', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Keep plan identity across schema loader warnings', type: 'Task' })).item;
+  await seed(pmRoot, item);
+  const fields = join(pmRoot, 'schema', 'fields.json');
+  // Both documents load the same effective schema but report different loader warnings.
+  let expected: string | undefined;
+  for (const bytes of ['{}', '{']) {
+    await writeFile(fields, bytes);
+    const preview = await previewAuthoringRepairs(pmRoot, { id: item.id });
+    assert.equal(preview.validation?.validated, true, bytes);
+    if (expected === undefined) expected = preview.plan_key;
+    else assert.equal(preview.plan_key, expected, bytes);
+  }
+});
+
 /** Aliased schema files retain their full bytes even when the file also stores settings. */
 test('repair schema aliases bind settings bytes across every section and handoff', async t => {
   const { client, pmRoot } = await tracker(t);
@@ -732,6 +749,26 @@ test('referenced schema cannot be silently dropped with excluded foreign operati
       await unchangedRefusal(pmRoot, item.id);
       assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
     }
+  }
+});
+
+/** Case-insensitive volumes resolve RUNTIME/fields.json to the excluded runtime directory. */
+test('repair schema path guards reject case aliases of excluded directories', async t => {
+  const { client, pmRoot } = await tracker(t);
+  const item = (await client.create({ title: 'Reject excluded directory case aliases', type: 'Task' })).item;
+  const path = join(pmRoot, 'settings.json');
+  const settings = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  await mkdir(join(pmRoot, 'RUNTIME'), { recursive: true });
+  const file = join(pmRoot, 'RUNTIME', 'fields.json');
+  await writeFile(file, '{"fields":[]}');
+  // On case-insensitive volumes these references resolve to the excluded runtime directory.
+  const sections = ['types', 'statuses', 'fields', 'workflows'];
+  const references = ['RUNTIME/fields.json', ' Runtime/fields.json ', '\t./runtime/fields.json \n', 'schema/../RUNTIME/fields.json'];
+  for (const [index, reference] of references.entries()) {
+    settings.schema = { files: { [sections[index]]: reference } };
+    await writeFile(path, JSON.stringify(settings));
+    await unchangedRefusal(pmRoot, item.id);
+    assert.equal(await readFile(file, 'utf8'), '{"fields":[]}');
   }
 });
 

@@ -166,7 +166,7 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
     // Disable hooks throughout every core read in the private snapshot, including staging.
     return runWithActiveExtensions({ path: boundRoot, noExtensions: true }, async () => {
       await options.onBoundary?.('settings_bound');
-      if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults. */ file => typeof file !== 'string' || Object.hasOwn(REPAIR_EXCLUDED_STATE, relative(boundRoot, resolve(boundRoot, file.trim())).split(sep)[0]))) {
+      if (schemaFiles.some(/** Excluded operational state cannot silently replace referenced schema with defaults, including case and Unicode aliases. */ file => typeof file !== 'string' || Object.keys(REPAIR_EXCLUDED_STATE).some(/** Case-insensitive volumes expose aliases like RUNTIME/fields.json for runtime/. */ excluded => excluded.normalize('NFC').toLowerCase() === relative(boundRoot, resolve(boundRoot, file.trim())).split(sep)[0].normalize('NFC').toLowerCase()))) {
         throw new RepairRefusal('unsafe_repair', 'Schema configuration must reference retained tracker files.', 'Move referenced schema files under the tracker schema directory before requesting a preview.');
       }
       let schemaContext: Awaited<ReturnType<typeof loadGuardedRuntimeSchema>>;
@@ -188,7 +188,8 @@ async function buildRepairPreview(pmRoot: string, request: RepairRequest, option
       await options.onBoundary?.('source_read');
       const revision = createHash('sha256').update(JSON.stringify([sourceDigest(item), raw])).digest('hex');
       if (request.revision !== undefined && request.revision !== revision) throw staleRevision();
-      const context = contextRevision(source, document, schemaContext);
+      // Plan identity binds the effective schema and file-backed definitions; loader warnings are diagnostics, not identity.
+      const context = contextRevision(source, document, [schemaContext.schema, schemaContext.type_definitions_from_file]);
       const original = located!.item_format === 'toon' ? decode(raw!) : JSON.parse(splitFrontMatter(raw!).frontMatter) as unknown;
       const { findings, patch } = mechanicalRepairs(item, (original as Record<string, unknown>).tags);
       if (Buffer.byteLength(JSON.stringify(patch)) > 16384) throw new RepairRefusal('limit_exceeded', 'The mechanical patch exceeds 16 KiB.', 'Review this item directly with pm get --full; repair the oversized field explicitly.');
