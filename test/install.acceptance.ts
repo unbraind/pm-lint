@@ -5,6 +5,7 @@ import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile, readdir } from 'n
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { decode } from '@toon-format/toon';
 import { PmClient, certifyCompleteListResult, splitAcceptanceCriteria } from '@unbrained/pm-cli/sdk';
 
 /** One lint verdict as rendered by the packed extension command. */
@@ -165,6 +166,19 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.equal(restated?.excerpt, 'Weak context item', 'the restated description is excerpted');
     assert.ok(initial.verdict.findings.every(finding => typeof finding.excerpt === 'string' && finding.excerpt.length <= 160), 'excerpts stay bounded');
     assert.equal(initial.verdict.summary.PML002.error, initial.verdict.findings.filter(finding => finding.rule === 'PML002').length, 'the per-rule summary counts findings by severity');
+    // Literal packed-output assertions detect shared precedence bugs in either runtime.
+    const settingsPath = join(pmRoot, 'settings.json');
+    const originalSettings = await readFile(settingsPath, 'utf8');
+    try {
+      await writeFile(settingsPath, JSON.stringify({ ...JSON.parse(originalSettings), lint: { disable: ['PML002'], failOn: 'info', rules: { PML002: { severity: 'info' } } } }));
+      for (const format of ['json', 'toon']) {
+        const result = runConsumer(cwd, runner, [...prefix, ...(format === 'json' ? ['--json'] : []), 'lint', '--rule', 'PML002', '--severity', 'error', '--fail-on', 'error'], pmRoot);
+        const verdict = (format === 'json' ? JSON.parse(result.stdout) : decode(result.stdout)) as LintVerdict;
+        assert.deepEqual(verdict.findings.map(row => [row.item_id, row.rule, row.severity]), [[created.id, 'PML002', 'error']]);
+        assert.equal(verdict.fail_on, 'error');
+        assert.equal(result.status, 1);
+      }
+    } finally { await writeFile(settingsPath, originalSettings); }
     // The rule table read command lists the documented defaults and settings keys.
     const listing = rulesCommand(cwd, runner, prefix, pmRoot);
     assert.equal(listing.count, 10);
@@ -256,6 +270,196 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.match(command(cwd, runner, [...prefix, 'lint', 'repair', '--id', created.id], pmRoot), /writes: 0/);
     await writeFile(join(cwd, 'repair-sdk.mjs'), `import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';\nconst result = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });\nif (result.writes !== 0 || result.remaining_mechanical !== 0 || typeof RepairRefusal !== 'function') throw new Error('Packed repair SDK contract failed');\nconsole.log('packed-repair-sdk-ok');\n`);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-sdk.mjs'], pmRoot), /packed-repair-sdk-ok/);
+    // The exact packed SDK preserves authoritative inputs, semantic replay and custom lifecycle roles.
+    await writeFile(join(cwd, 'repair-schema-contract.mjs'), `import assert from 'node:assert/strict';
+import { link, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { schemaUsesSettings } from '@unbrained/pm-lint/dist/src/repair-snapshot.js';
+import { PmClient, getItemPath, serializeItemDocument, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const root = resolve('.agents/pm');
+const path = resolve(root, 'settings.json');
+const fieldsPath = resolve(root, 'schema/fields.json');
+const statusesPath = resolve(root, 'schema/statuses.json');
+const original = await readFile(path, 'utf8');
+const fields = await readFile(fieldsPath, 'utf8');
+const statuses = await readFile(statusesPath, 'utf8');
+const client = new PmClient({ pmRoot: root, noExtensions: true });
+const item = (await client.get(${JSON.stringify(created.id)}, { full: true })).item;
+const itemPath = getItemPath(root, item.type, item.id);
+const itemBytes = await readFile(itemPath, 'utf8');
+try {
+  for (const alias of ['SETTINGS.JSON', 'Settings.Json']) {
+    const target = resolve(root, alias);
+    const createdAlias = await stat(target).catch(() => null) === null;
+    if (createdAlias) await link(path, target);
+    try { assert.equal(await schemaUsesSettings(root, [' schema/../' + alias + ' ']), true); }
+    finally { if (createdAlias) await unlink(target); }
+  }
+  const settings = { ...JSON.parse(original), schema: { files: { fields: ' schema/../settings.json ' } }, fields: [] };
+  await writeFile(path, JSON.stringify(settings));
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-schema-alias', run: async context => {
+    assert.notEqual(context.path, path);
+    await writeFile(context.path, JSON.stringify({ ...settings, fields: [{ key: 'title', required: true }] }));
+  } }] });
+  await assert.rejects(previewAuthoringRepairs(root, { id: item.id }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+  assert.equal(await readFile(path, 'utf8'), JSON.stringify(settings));
+  clearActiveExtensionHooks();
+  for (const directory of ['runtime', 'locks', 'extensions', 'transactions', 'checkpoints', 'search']) for (const section of ['types', 'statuses', 'fields', 'workflows']) {
+    const bytes = JSON.stringify({ ...JSON.parse(original), schema: { files: { [section]: ' ' + directory + '/repair-excluded-schema.json ' } } });
+    await writeFile(path, bytes);
+    await assert.rejects(previewAuthoringRepairs(root, { id: item.id }), error => error instanceof RepairRefusal && error.code === 'unsafe_repair');
+    assert.equal(await readFile(path, 'utf8'), bytes);
+  }
+  await writeFile(path, original);
+  const left = { type: 'string', enum: ['one', 'two'] };
+  const right = { type: 'number' };
+  const field = properties => ({ fields: [{ key: 'payload', type: 'object', value_schema: { type: 'object', properties } }] });
+  await writeFile(fieldsPath, JSON.stringify(field({ left, right })));
+  const first = await previewAuthoringRepairs(root, { id: item.id });
+  await writeFile(fieldsPath, JSON.stringify(field({ right, left: { enum: left.enum, type: left.type } })));
+  assert.equal((await previewAuthoringRepairs(root, { id: item.id })).plan_key, first.plan_key);
+  left.enum.reverse();
+  await writeFile(fieldsPath, JSON.stringify(field({ left, right })));
+  assert.notEqual((await previewAuthoringRepairs(root, { id: item.id })).plan_key, first.plan_key);
+  await writeFile(fieldsPath, fields);
+  const inline = properties => ({ ...JSON.parse(original), schema: { fields: field(properties).fields } });
+  await writeFile(path, JSON.stringify(inline({ left, right })));
+  const inlineFirst = await previewAuthoringRepairs(root, { id: item.id });
+  await writeFile(path, JSON.stringify(inline({ right, left: { enum: left.enum, type: left.type } })));
+  assert.equal((await previewAuthoringRepairs(root, { id: item.id })).plan_key, inlineFirst.plan_key);
+  left.enum.reverse();
+  await writeFile(path, JSON.stringify(inline({ left, right })));
+  assert.notEqual((await previewAuthoringRepairs(root, { id: item.id })).plan_key, inlineFirst.plan_key);
+  await writeFile(path, original);
+  await writeFile(statusesPath, JSON.stringify({ statuses: [{ id: 'delivered', roles: ['terminal', 'terminal_done'] }] }));
+  await writeFile(itemPath, serializeItemDocument({ metadata: { ...item, status: 'delivered', resolution: undefined, acceptance_criteria: undefined }, body: '' }));
+  const questions = (await previewAuthoringRepairs(root, { id: item.id })).questions.map(row => row.code);
+  assert.ok(questions.includes('PML004'));
+  assert.ok(!questions.includes('PML002'));
+} finally {
+  clearActiveExtensionHooks();
+  await writeFile(path, original);
+  await writeFile(fieldsPath, fields);
+  await writeFile(statusesPath, statuses);
+  await writeFile(itemPath, itemBytes);
+}
+console.log('packed-repair-schema-contract-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-schema-contract.mjs'], pmRoot), /packed-repair-schema-contract-ok/);
+    // Shipped repair code must reject a real hook changing policy inside its disposable snapshot.
+    await writeFile(join(cwd, 'repair-policy-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { isPmCliExpectedError, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const path = resolve('.agents/pm/settings.json');
+const before = await readFile(path, 'utf8');
+const settings = JSON.parse(before);
+const policies = [undefined, {}, { disable: ['PML002'] }, { rules: { PML003: { severity: 'info' } } }];
+try {
+  for (let index = 0; index < policies.length; index++) {
+    await writeFile(path, JSON.stringify({ ...settings, lint: policies[index] }));
+    const replacement = policies[(index + 1) % policies.length];
+    let observed = false;
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-policy-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      if (context.path.endsWith('settings.json')) {
+        observed = true;
+        await writeFile(context.path, JSON.stringify({ ...settings, lint: replacement }));
+      }
+    } }] });
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    assert.equal(observed, true);
+    assert.equal(await readFile(path, 'utf8'), JSON.stringify({ ...settings, lint: policies[index] }));
+    clearActiveExtensionHooks();
+  }
+  for (const bytes of ['{', 'null', '[]', JSON.stringify({ ...settings, lint: { failOn: 'fatal' } }), JSON.stringify({ ...settings, lint: null })]) {
+    await writeFile(path, before);
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-invalid-policy-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      await writeFile(context.path, bytes);
+    } }] });
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    clearActiveExtensionHooks();
+    assert.equal(await readFile(path, 'utf8'), before);
+    await writeFile(path, bytes);
+    await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => isPmCliExpectedError(error) && ['settings_section_invalid', 'settings_section_document_malformed'].includes(error.code));
+  }
+} finally { clearActiveExtensionHooks(); await writeFile(path, before); }
+console.log('packed-repair-policy-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-policy-sdk.mjs'], pmRoot), /packed-repair-policy-bound-ok/);
+    // Packed consumers also reject schema-only edits and suppress later hook interleavings.
+    await writeFile(join(cwd, 'repair-schema-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const path = resolve('.agents/pm/settings.json');
+const before = await readFile(path, 'utf8');
+const settings = JSON.parse(before);
+const expected = await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} });
+try {
+  for (const kind of ['reference', 'late', 'types', 'statuses', 'fields', 'workflows']) {
+    let calls = 0;
+    setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-schema-hook', run: async context => {
+      assert.notEqual(context.path, path);
+      if (context.path.endsWith('settings.json') && ++calls > (kind === 'late' ? 1 : 0)) {
+        if (kind === 'reference' || kind === 'late') await writeFile(context.path, JSON.stringify({ ...settings, schema: { files: { fields: 'schema/alternate-fields.json' } } }));
+        else {
+          const file = resolve(dirname(context.path), 'schema', kind + '.json');
+          await writeFile(file, (await readFile(file, 'utf8')) + ' ');
+        }
+      }
+    } }] });
+    if (kind === 'late') assert.deepEqual(await previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), expected);
+    else await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: ${JSON.stringify(created.id)} }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+    assert.equal(calls, 1);
+    assert.equal(await readFile(path, 'utf8'), before);
+    clearActiveExtensionHooks();
+  }
+} finally { clearActiveExtensionHooks(); }
+console.log('packed-repair-schema-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-schema-sdk.mjs'], pmRoot), /packed-repair-schema-bound-ok/);
+    // A hook's deferred ABA writes cannot reach the private planning/validation tracker.
+    await writeFile(join(cwd, 'repair-deferred-sdk.mjs'), `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { previewAuthoringRepairs, RepairRefusal } from '@unbrained/pm-lint';
+import { PmClient, getItemPath, serializeItemDocument, setActiveExtensionHooks, clearActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+const client = new PmClient({ pmRoot: '.agents/pm', noExtensions: true });
+const item = (await client.get(${JSON.stringify(created.id)}, { full: true })).item;
+const itemPath = getItemPath(resolve('.agents/pm'), item.type, item.id);
+const original = await readFile(itemPath, 'utf8');
+let exposedPath;
+let exposedBytes;
+try {
+  await writeFile(itemPath, serializeItemDocument({ metadata: { ...item, title: '  Verify captured settings  ' }, body: '' }));
+  const expected = await previewAuthoringRepairs('.agents/pm', { id: item.id });
+  assert.equal(expected.validation.validated, true);
+  setActiveExtensionHooks({ beforeCommand: [], beforeMutation: [], afterCommand: [], onWrite: [], onIndex: [], onRead: [{ layer: 'project', name: 'packed-deferred-writer', run: async context => {
+    if (context.path.endsWith('settings.json')) { exposedPath = context.path; exposedBytes = await readFile(context.path, 'utf8'); }
+  } }] });
+  for (const [change, restore] of [['source_read', 'planned'], ['planned', 'validated'], ['settings_bound', 'source_read']]) {
+    let restored = false;
+    const result = await previewAuthoringRepairs('.agents/pm', { id: item.id }, { onBoundary: async step => {
+      if (step === change) await writeFile(exposedPath, JSON.stringify({ ...JSON.parse(exposedBytes), item_format: 'md', item_types: { definitions: [{ name: item.type, folder: 'alternate-items' }] } }));
+      if (step === restore) { restored = true; await writeFile(exposedPath, exposedBytes); }
+    } });
+    assert.equal(restored, true);
+    assert.equal(result.plan_key, expected.plan_key);
+    assert.deepEqual(result.patch, expected.patch);
+    assert.equal(result.validation.validated, true);
+  }
+  await assert.rejects(previewAuthoringRepairs('.agents/pm', { id: item.id }, { onBoundary: async step => {
+    if (step === 'settings_read') await writeFile(exposedPath, JSON.stringify({ ...JSON.parse(exposedBytes), lint: { disable: ['PML001'] } }));
+  } }), error => error instanceof RepairRefusal && error.code === 'stale_revision');
+} finally { clearActiveExtensionHooks(); await writeFile(itemPath, original); }
+console.log('packed-deferred-settings-bound-ok');
+`);
+    assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-deferred-sdk.mjs'], pmRoot), /packed-deferred-settings-bound-ok/);
     // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
     const state = join(cwd, 'lint.local.json');
     const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);

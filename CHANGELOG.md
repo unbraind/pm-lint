@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
+
 ## 2026.11.7 - 2026-11-07
 
 No changes.

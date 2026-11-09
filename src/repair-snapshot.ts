@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { chmod, cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, cp, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { RepairRefusal } from './repairs.ts';
 
 /** Operational state and executable extensions are foreign to an observational authoring snapshot. */
@@ -10,14 +10,14 @@ export const REPAIR_EXCLUDED_STATE: Readonly<Record<string, string>> = { runtime
 /** Resolve excluded root entries once for snapshot copying and fingerprints. */
 const SKIPPED = new Set(Object.keys(REPAIR_EXCLUDED_STATE));
 
-/** Fingerprint regular source files and names without creating SDK caches in the source tracker. */
-async function fingerprint(root: string): Promise<string> {
+/** Bind retained file bytes and names; callers omitting settings must separately bind its sections and any schema use. */
+export async function fingerprint(root: string, omitSettings = false): Promise<string> {
   const hash = createHash('sha256');
   /** Recurse only inside the selected tracker and refuse links or special files. */
   async function visit(directory: string): Promise<void> {
     for (const entry of (await readdir(directory, { withFileTypes: true })).sort(/** Stable source ordering makes copy checks deterministic. */ (a, b) => a.name.localeCompare(b.name))) {
       const path = join(directory, entry.name);
-      if (SKIPPED.has(relative(root, path).split(/[\\/]/)[0])) continue;
+      if (SKIPPED.has(relative(root, path).split(/[\\/]/)[0]) || (omitSettings && relative(root, path) === 'settings.json')) continue;
       if (entry.isDirectory()) await visit(path);
       else if (entry.isFile()) { const bytes = await readFile(path); hash.update(JSON.stringify([relative(root, path), bytes.length])); hash.update(bytes); }
       else throw new RepairRefusal('unsafe_repair', 'Repair context requires regular tracker files.', 'Replace symbolic links or special files with ordinary tracker files before requesting a preview.');
@@ -54,4 +54,18 @@ async function writableDirectories(root: string): Promise<void> {
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (entry.isDirectory()) await writableDirectories(join(root, entry.name));
   }
+}
+
+/** Bind settings used as schema by file identity, including case aliases and hard links. */
+export async function schemaUsesSettings(root: string, files: readonly unknown[]): Promise<boolean> {
+  const settingsPath = join(root, 'settings.json');
+  const settings = await stat(settingsPath, { bigint: true });
+  for (const file of files) {
+    if (typeof file !== 'string') continue;
+    const path = resolve(root, file.trim());
+    if (path === settingsPath) return true;
+    const candidate = await stat(path, { bigint: true }).catch(/** Missing or unusable references are refused by the guarded schema loader. */ () => null);
+    if (candidate !== null && candidate.dev === settings.dev && candidate.ino === settings.ino) return true;
+  }
+  return false;
 }
