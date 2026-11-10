@@ -1,6 +1,6 @@
 {
   "name": "@unbrained/pm-lint",
-  "version": "2026.11.7",
+  "version": "2026.11.10",
   "description": "Authoring-quality lint rules for useful pm item context",
   "repository": {
     "type": "git",
