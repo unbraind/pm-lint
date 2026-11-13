@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Daily release never publishes: npm reads release-artifact/package.tgz as a GitHub repository ([pm-lint-4tem](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-4tem.toon))
+
 ## 2026.11.12 - 2026-11-12
 
 ### Other
