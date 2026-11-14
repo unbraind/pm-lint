@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-No changes.
+### Other
+
+- Pilot the pinned reusable Daily Release workflow ([pm-lint-release-caller-pilot](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-release-caller-pilot.toon))
 
 ## 2026.11.12 - 2026-11-12
 
