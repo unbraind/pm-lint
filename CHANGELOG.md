@@ -5,20 +5,12 @@
 ### Other
 
 - Close delivered pm items and reserve in progress for active work (2026-10-24) ([pm-lint-y8qd](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-y8qd.toon))
-- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
 
 ## 2026.11.12 - 2026-11-12
 
-### Dependencies
+### Other
 
-- Bump @unbrained/pm-cli ([#81](https://github.com/unbraind/pm-lint/pull/81))
-- Bump jscpd ([#78](https://github.com/unbraind/pm-lint/pull/78))
-- Bump @unbrained/pm-cli ([#77](https://github.com/unbraind/pm-lint/pull/77))
-- Bump the pm-toolchain group with 2 updates ([#72](https://github.com/unbraind/pm-lint/pull/72))
-- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#75](https://github.com/unbraind/pm-lint/pull/75))
-- Bump the codeql-action group across 1 directory with 2 updates ([#73](https://github.com/unbraind/pm-lint/pull/73))
-- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#74](https://github.com/unbraind/pm-lint/pull/74))
-- Bump the pm-toolchain group with 3 updates ([#70](https://github.com/unbraind/pm-lint/pull/70))
+- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
 
 ## 2026.11.7 - 2026-11-07
 
