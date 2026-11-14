@@ -2,11 +2,13 @@ id: pm-lint-sdk-settings-sections
 title: Adopt SDK lint settings section reads
 description: Replace private settings reopening and parsing with the public SDK section reader while retaining lint policy validation.
 type: Chore
-status: in_progress
+status: closed
 priority: 1
 tags[3]: "gh:unbraind/pm-lint#66",sdk-adoption,settings
 created_at: "2026-11-06T15:45:20.572Z"
-updated_at: "2026-11-09T01:53:24.558Z"
+updated_at: "2026-11-14T08:57:00.980Z"
+closed_at: "2026-11-14T08:57:00.929Z"
+completed_at: "2026-11-14T08:57:00.929Z"
 author: codex-sol
 acceptance_criteria: "Direct and registered command reads agree on policy; Malformed documents and sections produce typed SDK refusals; Absent policy, custom core schema and sibling sections remain compatible; Behavioral revert proofs and package gates pass"
 comments[59]{created_at,author,text}:
@@ -87,4 +89,5 @@ tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
 docs[2]{path,scope}:
   docs/repair-preview-validation.md,project
   README.md,project
+close_reason: "https://github.com/unbraind/pm-lint/pull/66 merged 2026-11-09T05:45:15Z; merge SHA 181f7a37033ff623574e2b21472719cd40aa84f7; PR head 7feee02f445c157067170923776bab7d26476ac1. Delivered: Public SDK lint settings-section reads and typed refusals preserve direct/registered policy parity, absent-policy and custom-schema compatibility with behavioral reverts. Green at that head: test (22), codeql, test (26), CodeQL, CodeRabbit. Other check outcomes: enable-auto-merge: SKIPPED; cubic · AI code reviewer: NEUTRAL; Sourcery review: SKIPPED (not counted as green)."
 body: ""
