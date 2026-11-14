@@ -4,8 +4,8 @@
 
 ### Other
 
-- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
 - Close delivered pm items and reserve in progress for active work (2026-10-24) ([pm-lint-y8qd](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-y8qd.toon))
+- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
 
 ## 2026.11.12 - 2026-11-12
 
