@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2026.11.14 - 2026-11-14
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.11.9 to 2026.11.10 in the pm-toolchain group ([#82](https://github.com/unbraind/pm-lint/pull/82))
 
 ## 2026.11.12 - 2026-11-12
 
