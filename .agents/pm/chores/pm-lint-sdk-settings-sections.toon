@@ -2,14 +2,17 @@ id: pm-lint-sdk-settings-sections
 title: Adopt SDK lint settings section reads
 description: Replace private settings reopening and parsing with the public SDK section reader while retaining lint policy validation.
 type: Chore
-status: in_progress
+status: closed
 priority: 1
 tags[3]: "gh:unbraind/pm-lint#66",sdk-adoption,settings
 created_at: "2026-11-06T15:45:20.572Z"
-updated_at: "2026-11-09T01:53:24.558Z"
+updated_at: "2026-11-14T10:11:43.098Z"
+closed_at: "2026-11-14T08:57:00.929Z"
+completed_at: "2026-11-09T05:45:15.000Z"
 author: codex-sol
 acceptance_criteria: "Direct and registered command reads agree on policy; Malformed documents and sections produce typed SDK refusals; Absent policy, custom core schema and sibling sections remain compatible; Behavioral revert proofs and package gates pass"
-comments[59]{created_at,author,text}:
+release: 2026.11.12
+comments[60]{created_at,author,text}:
   "2026-11-06T15:45:26.020Z",codex-sol,"Scope: pm-lint only, companion pm-cli-website-m8dy (G4), audit pm-cli-website-7zcy. Replace the private readSettings plus raw-file parser with readSettingsSection and its validator callback. Keep lint rule vocabulary, numeric windows and CLI precedence because these are package policy. Test real non-git trackers and registered commands through createExtensionTestHarness; record behavioral revert proofs. SDK 2026.11.4 already exports the needed API; dependency pins stay unchanged."
   "2026-11-06T15:49:10.888Z",codex-sol,"Implementation: removed lintSettingsFromText and private readSettings/raw-file recovery. readSettingsSection validates stored lint policy with resolveConfig; repairs reuse readLintSettings while retaining raw bytes only for snapshot digest and schema fencing. SDK section APIs shipped in 2026.11.2, so peer/manifest minimums move there while the 2026.11.4 dev pin stays unchanged. Targeted build plus settings/repair tests passed 16/16. Revert proofs in a disposable package copy: reverting only readLintSettings makes the policy test fail with Missing expected rejection and malformed-document test fail on untyped SyntaxError (each 0/1); restoring that reader and reverting only repair policy parsing makes the policy test fail on untyped Expected a lint settings object (0/1). The fixed targeted suite is rerunning via linked pm tests."
   "2026-11-06T15:53:01.395Z",codex-sol,"Linked pm test rerun passed 16/16 after the disposable revert checks. npm run typecheck, npm run lint, npm run duplication (0 percent), and npm run docstring passed. Confirmed readSettingsSection in the public 2026.11.2 package declarations. Full npm gate is running, with Bun and isolated-HOME verification to follow serially. The PR will use branch lint-sdk-settings-sections; CI and bot review are required before orchestrator verification. No SDK gaps encountered. Item remains in_progress; releasing the implementation claim for handoff."
@@ -69,6 +72,7 @@ comments[59]{created_at,author,text}:
   "2026-11-09T01:46:41.426Z",pi-glm,"Revert proofs (local mutation, this worktree):\n- Plan-identity fix reverted (contextRevision hashing the whole schema-loading context again): 'repair plan identity excludes schema loader warnings' FAILS; restored: PASSES.\n- Case-alias guard reverted (exact-name Object.hasOwn comparison): 'repair schema path guards reject case aliases of excluded directories' FAILS; restored: PASSES.\nGates at head: settings+repairs suites 34/34 pass; typecheck, lint, docstring, duplication (0% clone pairs), changelog:check and identity:check all clean. dist/ is not committed by this repo. No thread replies, no merge, no release."
   "2026-11-09T01:53:16.135Z",pi-glm,"pm test --run note: the full-suite linked command (npm run build + settings/repairs suites) was terminated by the runner's fixed 120s timeout at 119.5s with 31 passed/0 failed so far (host load artifact, not a test failure); the identical command run directly completes in ~126s with 34/34 pass. The three focused linked commands all passed, including the new regression pair."
   "2026-11-09T01:53:23.921Z",pi-glm,"Pushed head 7069b49 to lint-sdk-settings-sections (PR #66). Both CodeRabbit Minor findings fixed, one regression test each with recorded revert proofs. No thread replies, no merge, no release."
+  "2026-11-14T10:11:43.097Z",codex-sweep-1114,"Release-attribution correction: completed_at = 2026-11-09T05:45:15Z from https://github.com/unbraind/pm-lint/pull/66 (merge SHA 181f7a37033ff623574e2b21472719cd40aa84f7); first containing release tag v2026.11.12, recorded release 2026.11.12."
 files[9]{path,scope}:
   manifest.json,project
   package-lock.json,project
@@ -87,4 +91,5 @@ tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
 docs[2]{path,scope}:
   docs/repair-preview-validation.md,project
   README.md,project
+close_reason: "https://github.com/unbraind/pm-lint/pull/66 merged 2026-11-09T05:45:15Z; merge SHA 181f7a37033ff623574e2b21472719cd40aa84f7; PR head 7feee02f445c157067170923776bab7d26476ac1. Delivered: Public SDK lint settings-section reads and typed refusals preserve direct/registered policy parity, absent-policy and custom-schema compatibility with behavioral reverts. Green at that head: test (22), codeql, test (26), CodeQL, CodeRabbit. Other check outcomes: enable-auto-merge: SKIPPED; cubic · AI code reviewer: NEUTRAL; Sourcery review: SKIPPED (not counted as green)."
 body: ""
