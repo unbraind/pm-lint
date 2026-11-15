@@ -37,7 +37,9 @@ test('Unicode normalization cases preserve canonical producer closure and JSON/T
     }
     accepted++;
   }
-  assert.ok(accepted > 50 && refused > 50, 'the seed covers admitted and refused canonical boundaries');
+  assert.equal(accepted + refused, testDepth(500));
+  const minimum = (accepted + refused) / 10;
+  assert.ok(accepted > minimum && refused > minimum, 'generated cases cover admitted and refused canonical boundaries');
 });
 
 test('Unicode boundaries agree through file reads, repeated SDK calls and git-free JSON/TOON commands', async t => {

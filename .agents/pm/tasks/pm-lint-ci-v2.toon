@@ -6,13 +6,15 @@ status: in_progress
 priority: 2
 tags[2]: ci,performance
 created_at: "2026-11-15T16:17:52.504Z"
-updated_at: "2026-11-15T16:24:02.423Z"
+updated_at: "2026-11-15T16:32:01.393Z"
 assignee: codex-sol
 claim_principal: codex-sol
 author: codex-sol
-comments[2]{created_at,author,text}:
+comments[4]{created_at,author,text}:
   "2026-11-15T16:19:39.457Z",codex-sol,"Required checks remain test (22), test (26), codeql; no CodeQL path filters. Main run 42818809945 queue-inclusive walls 80m49s/94m14s, npm gates 6m16s/5m43s (22/26), Bun 26 repeated 5m43s. Slowest model 191-194s and packed acceptance ~97s. Deep retains npm/Bun on both Node 22/26 as requested (old PR Bun ran only on 26). Packed acceptance already proves real Bun/bunx installs and reads the README/docs package list, so docs-only CI retains it and Bun setup. Identity/private-path policy runs on every PR leg. Release caller #85 and verifier scripts remain untouched."
   "2026-11-15T16:24:02.423Z",codex-sol,"Typecheck/lint passed; linked static checks passed in 21.313s. Strict YAML and per-job timeout checks passed; actionlint unavailable. Quick fuzz counts use actual emitted+refused totals with an exact generated count assertion; full depth keeps >50 outcomes of each kind. Harness scales are finite/positive and rounded before test bodies or direct-child spawns; no product budget assertions are scaled. Initial local conflict CLI check failed during overlapping dist builds; focused rerun passed 1/1 in 15.485s after builds completed, with root cause awaiting the original error detail. Bounded quick coverage and packed acceptance remain running. Pushing early without waiting for GitHub CI."
+  "2026-11-15T16:28:22.993Z",codex-sol,"Original local failures identified: the first touched run preceded the fresh worktree initial build, and the conflict CLI reported missing dist/index.js (generated output is not tracked here). Its built rerun passed. Unicode normalization had a second full-depth >50 outcome threshold; it now uses actual accepted+refused counts with an exact generated-count assertion, preserving the full-depth threshold. Changelog check requires the new Task Unreleased entry, being generated through the existing script. Ambient global extension health skew is the existing pm-lint-managed-extension-health-skew item; scratch-global strict health passes, leaving CI thresholds unchanged."
+  "2026-11-15T16:32:01.392Z",codex-sol,"Corrected conflict and Unicode quick suites passed 9/9 in 103.445s, including built no-git CLI activation. Initial CLI setup error was missing initial build output, confirmed by the original activation diagnostic; no product change was needed. Both outcome thresholds now derive from generated counts and retain original full-depth minima. Generated six-line Unreleased changelog entry through changelog:full; changelog:check now passes. Strict tracker health with a scratch global profile passes; ambient skew remains documented in the existing follow-up. One quick coverage run and packed acceptance remain within their bounded local budgets."
 files[12]{path,scope}:
   .github/workflows/ci-deep.yml,project
   .github/workflows/ci.yml,project
