@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
@@ -20,7 +21,7 @@ async function nativeState(client: Awaited<ReturnType<typeof tracker>>['client']
   return structuredClone((await client.get(id, { full: true })).item);
 }
 
-test('500 seeded random sequences preserve SDK-read state across document/output round trips and older request replays', async t => {
+test('seeded random sequences preserve SDK-read state across document/output round trips and older request replays', async t => {
   const { client, pmRoot } = await tracker(t);
   const peer = (await client.create({ title: 'Preserve related peer context', type: 'Epic' })).item;
   const item = (await client.create({ title: 'Preserve every native authoring field', type: 'Issue', description: 'Context', acceptanceCriteria: 'The test exits zero', expectedResult: 'A visible result', actualResult: 'An observed failure', parent: peer.id, risk: 'low', confidence: 'high', environment: 'synthetic', component: 'parser', regression: "true", reproSteps: 'Run the synthetic command', affectedVersion: '1', fixedVersion: '2', customerImpact: 'Local test', severity: 'low', reporter: 'test-agent', definitionOfReady: 'Fixture exists', goal: 'synthetic-goal', objective: 'synthetic-objective', value: 'Clear repair context', impact: 'Preserved state', outcome: 'Reviewable repairs', whyNow: 'Regression coverage', estimatedMinutes: '20', order: '3', sprint: 'synthetic', release: 'synthetic' })).item;
@@ -31,7 +32,7 @@ test('500 seeded random sequences preserve SDK-read state across document/output
   const documents: ItemDocument[] = [];
   const keyByRevision = new Map<string, string>();
   let latest: ItemMetadata = { ...item, dependencies: [{ id: peer.id, kind: 'related', author: 'test-agent', created_at: item.created_at }], comments: [{ author: 'test-agent', created_at: item.created_at, text: 'Preserve comments' }], notes: [{ author: 'test-agent', created_at: item.created_at, text: 'Preserve notes' }], learnings: [{ author: 'test-agent', created_at: item.created_at, text: 'Preserve learnings' }], files: [{ path: 'src/example.ts', scope: 'project' }], docs: [{ path: 'README.md', scope: 'project' }], tests: [{ command: 'node --test', note: 'Never execute from preview', scope: 'project' }] };
-  for (let sequence = 0; sequence < 500; sequence += 1) {
+  for (let sequence = 0; sequence < testDepth(500); sequence += 1) {
     // Each sequence has 4-6 operations: native document import, read, preview/export,
     // optional saved-request replay and an independent SDK mutation + second preview.
     const replay = documents.length > 0 && rng() < 0.25;
