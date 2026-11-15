@@ -69,3 +69,24 @@ gates took 6m16s/5m43s; repeated Bun 26 took 5m43s. The slowest 500-sequence
 repair model took about 191–194s; packed acceptance took about 97s. Local quick
 proof and the PR CI snapshot are recorded in the tracker and PR. Timings across
 different hosts do not establish a same-hardware speed ratio.
+
+Local proof: linked typecheck/lint passed in 21.31s; final lint, identity,
+changelog and attestation passed. Corrected conflict/Unicode suites passed
+9/9 in 1m43.45s. The initial touched run passed 20/22 in 6m30.48s: one CLI
+fixture started before this fresh worktree's initial build (missing generated
+`dist/index.js`), and one Unicode full-depth outcome minimum needed the same
+generated-count adaptation as the fuzz corpus. Both focused corrections passed.
+
+Packed consumer acceptance passed in 14m29.56s (suite 14m21.02s). The single
+quick coverage attempt took 17m06.34s and passed 208/209 tests. Its Unicode
+module was loaded before the threshold correction; the corrected test passed
+in the focused rerun. c8 reported 100% totals in all four dimensions, but the
+coverage command exited 1 and did not certify the source-presence reconciliation.
+This is not a passing quick gate claim. Fresh PR CI covers the corrected head;
+no second broad local run or full-depth run was attempted.
+
+Strict health passes with an empty scratch global profile. The ambient profile
+reproduces the existing `pm-lint-managed-extension-health-skew` diagnostic;
+that follow-up has the evidence. No unrelated extension, dependency pin or
+health threshold was changed. CI and deep certification remain unverified at
+handoff; the rollout does not wait for the shared GitHub queue.
