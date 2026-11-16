@@ -4,7 +4,13 @@
 
 ### Other
 
-- Close delivered pm items and reserve in progress for active work (2026-10-24) ([pm-lint-y8qd](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-y8qd.toon))
+- Split quick PR checks from exhaustive local CI ([pm-lint-ci-v2](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-ci-v2.toon))
+
+## 2026.11.14 - 2026-11-14
+
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.11.9 to 2026.11.10 in the pm-toolchain group ([#82](https://github.com/unbraind/pm-lint/pull/82))
 
 ## 2026.11.12 - 2026-11-12
 

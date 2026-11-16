@@ -1,3 +1,4 @@
+import { testTime } from "./support/time.ts";
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -49,7 +50,7 @@ function consumerEnv(cwd: string, pmRoot: string, home = cwd): NodeJS.ProcessEnv
 
 /** Execute a real consumer process and preserve diagnostics on unexpected exits. */
 function runConsumer(cwd: string, name: string, args: string[], pmRoot: string, home = cwd, expectedStatus?: number): { stdout: string; status: number | null } {
-  const result = spawnSync(name, args, { cwd, encoding: 'utf8', env: consumerEnv(cwd, pmRoot, home), maxBuffer: 16 * 1024 * 1024 });
+  const result = spawnSync(name, args, { timeout: testTime(300000), killSignal: 'SIGKILL', cwd, encoding: 'utf8', env: consumerEnv(cwd, pmRoot, home), maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.error, undefined);
   assert.ok(expectedStatus === undefined ? result.status === 0 || result.status === 1 : result.status === expectedStatus, `${name} ${args.join(' ')}\n${result.stderr}\n${result.stdout}`);
   return { stdout: result.stdout, status: result.status };
@@ -117,7 +118,7 @@ function continuationRows(cwd: string, runner: string, prefix: string[], pmRoot:
   assert.fail('continuation did not terminate within 100 pages');
 }
 
-test('packed npm/npx and native Bun/bunx consumers lint a real tracker through the extension', { timeout: 3600000 }, async t => {
+test('packed npm/npx and native Bun/bunx consumers lint a real tracker through the extension', { timeout: testTime(1200000) }, async t => {
   const root = resolve(import.meta.dirname, '..');
   const scratch = await mkdtemp(join(tmpdir(), 'pm-lint-install-'));
   // Package-manager caches can still be flushing when the scratch directory is removed.
@@ -229,7 +230,7 @@ test('packed npm/npx and native Bun/bunx consumers lint a real tracker through t
     assert.deepEqual(Object.keys(limitedRules.rules[0]).sort(), ['code', 'scope'], 'the host projects declared rule rows');
     assert.deepEqual(continuationRows(cwd, runner, prefix, pmRoot, ['rules'], 'rules', 'code'), RULE_CODES, 'rule continuations cover the full registry');
     // The host renderer emits TOON by default and keeps the exit contract.
-    const toon = spawnSync(runner, [...prefix, 'lint'], { cwd, encoding: 'utf8', env: { ...process.env, HOME: cwd, PM_PATH: pmRoot, PM_AUTHOR: 'install-test' } });
+    const toon = spawnSync(runner, [...prefix, 'lint'], { timeout: testTime(300000), killSignal: 'SIGKILL', cwd, encoding: 'utf8', env: { ...process.env, HOME: cwd, PM_PATH: pmRoot, PM_AUTHOR: 'install-test' } });
     assert.equal(toon.error, undefined);
     assert.ok(toon.stdout.length > 0, 'the default rendering is host TOON, not silence');
     assert.equal(toon.status, initial.verdict.exit_code ?? 0, 'TOON and JSON renderings share one exit contract');
@@ -479,7 +480,7 @@ console.log('packed-deferred-settings-bound-ok');
     const globalRoot = join(scratch, `${runtime}-global`);
     const globalEnv = { ...consumerEnv(cwd, pmRoot), BUN_INSTALL_GLOBAL_DIR: join(globalRoot, 'packages'), BUN_INSTALL_BIN: join(globalRoot, 'bin') };
     const globalArgs = runtime === 'npm' ? ['install', '--global', '--prefix', globalRoot, '--ignore-scripts', '--no-audit', '--no-fund', `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`] : ['add', '--global', '--ignore-scripts', `@unbrained/pm-cli@${sdk.devDependencies['@unbrained/pm-cli']}`];
-    const globalInstall = spawnSync(runtime, globalArgs, { cwd, env: globalEnv, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    const globalInstall = spawnSync(runtime, globalArgs, { timeout: testTime(300000), killSignal: 'SIGKILL', cwd, env: globalEnv, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
     assert.equal(globalInstall.status, 0, globalInstall.stderr);
     const globalRead = jsonRead(cwd, runtime === 'npm' ? process.execPath : 'bun', [join(globalRoot, 'bin', 'pm')], pmRoot, ['incremental'], ['--state', state]);
     assert.equal(globalRead.data.ok, true);

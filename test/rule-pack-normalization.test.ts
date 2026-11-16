@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { writeFile } from 'node:fs/promises';
@@ -11,13 +12,13 @@ import { installBuiltExtension, runGitFreeCli, tracker } from './helpers.ts';
 /** Require a bounded refusal without admitting an invalid producer result. */
 function exceedsLiteral(error: unknown): boolean { return error instanceof RulePackRefusal && error.code === 'limit_exceeded' && error.remedy.length > 0; }
 
-test('500 Unicode normalization cases preserve canonical producer closure and JSON/TOON analysis', () => {
+test('Unicode normalization cases preserve canonical producer closure and JSON/TOON analysis', () => {
   let seed = 0x01302026;
   const atoms = ['\u0130', 'A', '\u03a3', 'I\u0307', '\ud83d\ude80', 'constructor', '__proto__'];
   const lengths = [1, 2, 31, 128, 255, 256, 257, 300, 511, 512, 513];
   let accepted = 0;
   let refused = 0;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     const value = `${seed % 3 === 0 ? ' \r\n' : ''}${atoms[seed % atoms.length].repeat(lengths[(seed >>> 8) % lengths.length])}${seed % 5 === 0 ? '\t ' : ''}`;
     const input = policy(constraint('Unicode', 'tags', { op: seed % 2 === 0 ? 'required_tag' : 'forbidden_tag', value }));
@@ -36,7 +37,9 @@ test('500 Unicode normalization cases preserve canonical producer closure and JS
     }
     accepted++;
   }
-  assert.ok(accepted > 50 && refused > 50, 'the seed covers admitted and refused canonical boundaries');
+  assert.equal(accepted + refused, testDepth(500));
+  const minimum = (accepted + refused) / 10;
+  assert.ok(accepted > minimum && refused > minimum, 'generated cases cover admitted and refused canonical boundaries');
 });
 
 test('Unicode boundaries agree through file reads, repeated SDK calls and git-free JSON/TOON commands', async t => {

@@ -1,22 +1,25 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request: {}
-  workflow_dispatch: {}
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PM_TEST_DEPTH: quick
     strategy:
       fail-fast: false
       matrix:
-        # 22 is the floor declared in `engines` and the first line that strips
-        # TypeScript without a flag; 26 is what the fleet develops against.
         node-version: [22, 26]
     steps:
       - name: Checkout
@@ -26,12 +29,35 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Detect code changes
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          code=true
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            code=false
+            git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/ci-changed-paths"
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                .agents/pm/*.mjs|.agents/pm/*.cjs|.agents/pm/*.js|.agents/pm/*.ts) code=true ;;
+                .agents/pm/*|*.md|docs/*|CHANGELOG.md|LICENSE) ;;
+                *) code=true ;;
+              esac
+            done < "$RUNNER_TEMP/ci-changed-paths"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
+      # Documentation changes also run packed Bun consumer acceptance.
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
@@ -57,15 +83,29 @@ jobs:
           # clone-local merge driver config declared by .gitattributes is absent.
           ./node_modules/.bin/pm health --strict-exit --require-merge-drivers
 
+
       - name: Verify commit identities and private path policy
         run: npm run identity:check
 
-      - name: npm release gates
+      - name: Documentation, tracker and public identity gates
+        if: steps.changes.outputs.code != 'true'
+        run: |
+          npm run changelog:check
+          npm run verify:release-publish-attestation
+          npm run pack:dry-run
+          node --test --test-concurrency=2 test/release-approval.test.ts test/package-metadata.test.ts
+          npm run test:install
+
+      - name: Engines floor build and tests
+        if: steps.changes.outputs.code == 'true' && matrix.node-version == 22
+        run: npm test
+
+      - name: Quick npm release gate
+        if: steps.changes.outputs.code == 'true' && matrix.node-version == 26
         run: npm run release:check
 
-      - name: Verify Bun can install the package graph
-        run: bun install --no-save
-
-      - name: Bun release gates
-        if: matrix.node-version == 26
-        run: bun run release:check
+      - name: Bun package graph and bunx smoke
+        if: steps.changes.outputs.code == 'true' && matrix.node-version == 26
+        run: |
+          bun install --no-save
+          bunx --no-install pm --version
