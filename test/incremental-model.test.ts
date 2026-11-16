@@ -1,3 +1,5 @@
+import { testTime } from "./support/time.ts";
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -17,7 +19,7 @@ function random(seed: number): () => number {
   return () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
 }
 
-test('500 model sequences preserve SDK state through checkpoint imports, exports, old replays and native variants', { timeout: 600000 }, async t => {
+test('model sequences preserve SDK state through checkpoint imports, exports, old replays and native variants', { timeout: testTime(600000) }, async t => {
   const { client, pmRoot } = await tracker(t);
   const peer = (await client.create({ title: 'Retain explicit relationship target', type: 'Epic', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true })).item;
   const item = (await client.create({ title: 'Retain all native source fields', type: 'Issue', parent: peer.id, goal: 'goal', objective: 'objective', sprint: 'sprint', release: 'release', clearDeps: true, acceptanceCriteria: 'The SDK returns complete native state', expectedResult: 'A stable result', actualResult: 'A visible result', resolution: 'Verified result', risk: 'low', confidence: 'high', environment: 'synthetic', component: 'parser', regression: 'true', reproSteps: 'Run a native check', affectedVersion: '1', fixedVersion: '2', customerImpact: 'Synthetic evidence', severity: 'low', reporter: 'test-agent', definitionOfReady: 'Fixture exists', value: 'Preserved context', impact: 'Complete state', outcome: 'Reproducible evidence', whyNow: 'Regression coverage', estimatedMinutes: '20', order: '3' })).item;
@@ -29,7 +31,7 @@ test('500 model sequences preserve SDK state through checkpoint imports, exports
   const checkpoints: IncrementalCheckpoint[] = [];
   const now = Date.parse('2027-01-01T00:00:00Z');
   let checkpoint = (await lintIncremental(source, { rebuild: true, now })).checkpoint;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const at = new Date(Date.UTC(2026, 0, 1, 0, 0, sequence)).toISOString();
     const metadata: ItemMetadata = { ...item, status: ['open', 'in_progress', 'blocked', 'closed', 'canceled'][Math.floor(rng() * 5)] as ItemMetadata['status'], title: rng() < 0.4 ? ` \tTODO ${sequence}\r\n` : `Verify native field ${sequence}`, description: rng() < 0.5 ? `Verify native field ${sequence}` : `Source context ${sequence}`, acceptance_criteria: rng() < 0.5 ? 'works' : `The command returns ${sequence}`, resolution: rng() < 0.5 ? undefined : `Recorded result ${sequence}`, actual_result: rng() < 0.5 ? undefined : `Observed result ${sequence}`, close_reason: rng() < 0.5 ? undefined : 'A recorded close reason', closed_at: at, updated_at: at, assignee: rng() < 0.5 ? 'synthetic-agent' : undefined, claim_principal: rng() < 0.5 ? 'synthetic-agent' : undefined, parent: rng() < 0.5 ? peer.id : undefined, blocked_reason: rng() < 0.5 ? 'Waiting for a recorded prerequisite' : undefined, blocked_by: rng() < 0.5 ? peer.id : 'pm-missing-blocker', dependencies: [{ id: peer.id, kind: rng() < 0.5 ? 'blocked_by' : 'related', author: 'test-agent', created_at: at }], comments: [{ text: rng() < 0.5 ? 'Closed: verified outcome' : 'Current work context', author: 'test-agent', created_at: at }], notes: [{ text: rng() < 0.5 ? `Verify native field ${sequence}` : 'Additional context', author: 'test-agent', created_at: at }], test_runs: rng() < 0.5 ? [] : [{ run_id: `synthetic-${sequence}`, kind: 'test', status: 'passed', started_at: at, finished_at: at, recorded_at: new Date(Date.parse(at) + 86400000).toISOString(), passed: 1, failed: 0, skipped: 0 }], files: rng() < 0.5 ? [] : [{ path: 'src/example.ts', scope: 'project' }], tests: rng() < 0.5 ? [] : [{ command: 'node --test', scope: 'project' }], docs: [{ path: 'README.md', scope: 'project' }], learnings: [{ text: `Preserve native learning ${sequence}`, author: 'test-agent', created_at: at }], tags: ['source', `sequence-${sequence}`] };
     const document = documents.length > 0 && rng() < 0.25 ? structuredClone(documents[Math.floor(rng() * documents.length)]) : { metadata, body: `Preserve body ${sequence}  \r\n\r\nAnd relationships\r\n` };
@@ -64,12 +66,12 @@ test('500 model sequences preserve SDK state through checkpoint imports, exports
   }
 });
 
-test('500 random custom registries preserve lifecycle decisions under status renaming', async t => {
+test('random custom registries preserve lifecycle decisions under status renaming', async t => {
   const { client } = await tracker(t);
   const item = (await client.create({ title: 'Test custom active statuses', type: 'Task', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true })).item;
   const rng = random(0x57a7e);
   const stale = RULES.find(rule => rule.code === 'PML005')!;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const names = ['ready', 'working', 'waiting', 'completed', 'discarded'].map(name => `${name}_${Math.floor(rng() * 1000000)}`);
     const roles = [['active', 'default_open'], ['active'], ['blocked'], ['terminal', 'terminal_done'], ['terminal', 'terminal_canceled']] as const;
     const registry = resolveRuntimeStatusRegistry({ version: 1, files: {}, fields: [], statuses: names.map((id, i) => ({ id, roles: [...roles[i]] })), workflow: { open_status: names[0], in_progress_status: names[1], blocked_status: names[2], close_status: names[3], canceled_status: names[4] }, unknown_field_policy: 'allow' });

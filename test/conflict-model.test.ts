@@ -1,3 +1,5 @@
+import { testTime } from "./support/time.ts";
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { writeFile, rm, cp } from 'node:fs/promises';
@@ -62,7 +64,7 @@ function expectedWitness(pack: RulePack): string[] | null {
   return null;
 }
 
-test('500 seeded operation sequences agree with an exhaustive oracle and preserve SDK-read native state through old pack replays', { timeout: 600000 }, async t => {
+test('seeded operation sequences agree with an exhaustive oracle and preserve SDK-read native state through old pack replays', { timeout: testTime(600000) }, async t => {
   const actual = await tracker(t);
   const reference = await tracker(t);
   const peer = (await actual.client.create({ type: 'Epic', title: 'Explicit source relationship', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true })).item;
@@ -70,7 +72,7 @@ test('500 seeded operation sequences agree with an exhaustive oracle and preserv
   await cp(actual.pmRoot, reference.pmRoot, { recursive: true });
   const rng = random(0xc0f11c7);
   const saved: { pack: RulePack; document: ItemDocument }[] = [];
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const record = saved.length > 0 && rng() < 0.3 ? structuredClone(saved[Math.floor(rng() * saved.length)]) : {
       pack: generated(rng),
       document: { metadata: { ...item, title: ` \tContext ${sequence}\r\n`, description: `Description ${sequence}\r\n`, acceptance_criteria: `Observed ${sequence}  \r\n`, definition_of_ready: `Ready ${sequence}`, resolution: `Resolution ${sequence}`, blocked_reason: `Reason ${sequence}`, outcome: `Outcome ${sequence}`, value: `Value ${sequence}`, why_now: `Now ${sequence}`, priority: Math.floor(rng() * 5) as typeof item.priority, tags: ['a', 'b', 'c'].filter(() => rng() < 0.5), status: ['open', 'in_progress', 'closed', 'blocked'][Math.floor(rng() * 4)] as typeof item.status, parent: rng() < 0.5 ? peer.id : undefined, dependencies: [{ id: peer.id, kind: 'related' as const, author: 'model-test', created_at: item.created_at }] }, body: `Retain source body ${sequence}\r\n` },

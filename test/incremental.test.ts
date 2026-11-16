@@ -1,3 +1,5 @@
+import { testTime } from "./support/time.ts";
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdir, open, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
@@ -112,7 +114,7 @@ test('one strict schema rejects malformed and extreme inputs while allowing lega
   assert.throws(() => parseIncrementalCheckpoint({ ...checkpoint, items: disguisedSparse }), refusal('invalid_input'));
   const legacy = signed({ ...checkpoint, items: [{ ...checkpoint.items[0], id: 'Legacy.Item/42' }] });
   assert.equal(parseIncrementalCheckpoint(legacy).items[0].id, 'Legacy.Item/42');
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < testDepth(500); i++) {
     const transported = JSON.parse(JSON.stringify({ ...checkpoint, items: checkpoint.items.map(item => ({ ...item, violations: i % 1024 })) })) as IncrementalCheckpoint;
     assert.deepEqual(parseIncrementalCheckpoint(signed(transported)), signed(transported));
   }
@@ -233,7 +235,7 @@ test('registered command renders compact refusals and real TOON/JSON without git
   await assert.rejects(runIncrementalCommand({ ...context, options: { state: path } }));
 });
 
-test('SDK pagination and saved-anchor verification cross real thousand-event boundaries', { timeout: 180000 }, async t => {
+test('SDK pagination and saved-anchor verification cross real thousand-event boundaries', { timeout: testTime(180000) }, async t => {
   const { client, pmRoot } = await tracker(t);
   const created = await client.create({ title: 'Paginate actual native history', type: 'Task', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true });
   const document = { metadata: created.item, body: '' };
@@ -247,7 +249,7 @@ test('SDK pagination and saved-anchor verification cross real thousand-event bou
   assert.deepEqual(update.result, await lintItems(client, pmRoot));
 });
 
-test('10000-item title edit evaluates only affected pairs and declared globals', { timeout: 180000 }, async t => {
+test('10000-item title edit evaluates only affected pairs and declared globals', { timeout: testTime(180000) }, async t => {
   const { client, pmRoot } = await tracker(t);
   const base = (await client.create({ title: 'Seed isolated scale corpus', type: 'Task', acceptanceCriteria: 'The command returns an observable result', unset: ['parent', 'goal', 'objective', 'sprint', 'release'], clearDeps: true })).item;
   // Native SDK serialization seeds real on-disk rows; actual edits and every read use the SDK.
