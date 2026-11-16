@@ -1,0 +1,27 @@
+id: pm-lint-hsa6
+title: Unblock the pm-github 2026.11.15 pin PR gates
+description: ""
+type: Task
+status: in_progress
+priority: 2
+tags[1]: "gh:unbraind/pm-lint#86"
+created_at: "2026-11-16T09:42:16.526Z"
+updated_at: "2026-11-16T12:15:14.925Z"
+assignee: codex-sol
+claim_principal: codex-sol
+author: pi-glm
+comments[3]{created_at,author,text}:
+  "2026-11-16T09:42:37.745Z",pi-glm,"PR checks test (22) and test (26) fail in the 'npm release gates' step at changelog:check: the committed CHANGELOG.md was stale — the generator expected an '## Unreleased / No changes.' section before the 2026.11.14 entry (log: 'Changelog is out of date'). Root cause: the pin branch was cut before the changelog regeneration landed on main. Fix: merge origin/main (which already carries the regenerated CHANGELOG.md; changelog:check passes again on the merged tree) — no changelog hand-edit, the file comes from the repo's changelog script on main. No review threads on this PR. Because this tracker's changelog includes in_progress items, the changelog is regenerated with the repo script again after this item's changes so changelog:check stays green at the pushed head."
+  "2026-11-16T12:07:10.258Z",codex-sol,"Codex continuation: preserved merge 6c4c5cf and the existing uncommitted tracker item. Rechecking both failed check logs and regenerating the changelog from tracker data; no duplicate item or PR. No review threads were returned."
+  "2026-11-16T12:15:14.924Z",codex-sol,"Verified both failed jobs directly: 132764539585 log line 2115 and 132764539836 log line 955 report Changelog is out of date. Regenerated with npm run changelog:full after preserving the main merge and existing tracker item. Typecheck, lint, and linked exact caller-contract regression pass; quick npm tests are still running. No review threads were returned."
+files[4]{path,scope}:
+  .github/workflows/pm-github-closeout.yml,project
+  .github/workflows/pm-github-sync.yml,project
+  CHANGELOG.md,project
+  test/pm-github-callers.test.ts,project
+tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  "npm run changelog:check",project,pi-glm,"2026-11-16T09:42:57.107Z",local_mutation,ci/pm-github-2026.11.15-bounded-ci-dispatch
+  npm run typecheck,project,pi-glm,"2026-11-16T09:43:00.849Z",local_mutation,ci/pm-github-2026.11.15-bounded-ci-dispatch
+  npm run lint,project,pi-glm,"2026-11-16T09:43:06.370Z",local_mutation,ci/pm-github-2026.11.15-bounded-ci-dispatch
+  node --test test/pm-github-callers.test.ts,project,codex-sol,"2026-11-16T12:07:53.491Z",local_mutation,ci/pm-github-2026.11.15-bounded-ci-dispatch
+body: ""

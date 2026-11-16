@@ -4,6 +4,7 @@
 
 ### Other
 
+- Unblock the pm-github 2026.11.15 pin PR gates ([pm-lint-hsa6](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-hsa6.toon))
 - Split quick PR checks from exhaustive local CI ([pm-lint-ci-v2](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-ci-v2.toon))
 
 ## 2026.11.14 - 2026-11-14
