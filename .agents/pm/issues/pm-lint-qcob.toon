@@ -6,10 +6,10 @@ status: in_progress
 priority: 2
 tags[1]: "gh:unbraind/pm-ops#284"
 created_at: "2026-11-16T14:41:56.962Z"
-updated_at: "2026-11-16T16:48:00.296Z"
+updated_at: "2026-11-16T19:28:34.897Z"
 author: pi-glm
 acceptance_criteria: The release workflow installs the pinned npm with --prefix into a job-local directory and prepends that prefix bin to the job path; The workflow keeps the exact-version assertion on the effective npm; A workflow-contract test fails if any workflow replaces the global npm
-comments[7]{created_at,author,text}:
+comments[9]{created_at,author,text}:
   "2026-11-16T15:17:30.403Z",codex-sol,"Continuation: verified the existing worktree and remote branch state, preserved the earlier changes, and reused this item. Rerunning required gates to completion under the continuation author before committing results."
   "2026-11-16T15:28:18.044Z",codex-sol,"Root cause confirmed in the workflow source: global installation of the pinned npm replaces the same Node installation used by parallel jobs on a shared toolcache. Replaced each bootstrap with a job-local prefix, published only its bin directory to the job PATH, and retained exact-pin checks including a separate subsequent-step assertion. Workflow contracts reject global npm replacement across all workflow files. No runner settings or shared tool installations were modified."
   "2026-11-16T15:42:15.343Z",codex-sol,The first combined gate command hit its 20-minute timeout during shared-host disk contention and is not pass evidence. Retrying all gates to completion using memory-backed temporary fixtures and the existing harness deadline scale. Assertions and test selection are unchanged.
@@ -17,12 +17,17 @@ comments[7]{created_at,author,text}:
   "2026-11-16T16:02:00.880Z",codex-sol,"Before publication: typecheck and lint completed successfully. The focused workflow contract suite passed 33 tests, and changelog:check passed after generating the required in-progress item entry. The first full quick test command timed out under disk contention; its replacement is active and remains pending evidence. Publishing a draft for exact-head CI validation."
   "2026-11-16T16:11:55.188Z",codex-sol,"Implementation commit c9cdd8267c642641d175b2c9a8bb227231982f36 contains the requested fix and package-owned regression contracts. Focused contracts and changelog verification passed; typecheck and lint or the existing docstring static gate passed. The first broad quick attempt timed out, and its replacement remains active. The shared runner dispatch hold is respected before publication. Releasing the claim for orchestrator verification."
   "2026-11-16T16:47:55.534Z",codex-sol,"The broad local retry reached its 60-minute command limit before completion; the repairs acceptance did not complete successfully. Typecheck, lint, all 33 focused workflow contracts and changelog:check passed separately. The broad suite remains an explicit validation gap. Tracking PR: https://github.com/unbraind/pm-lint/pull/92. The PR remains open for orchestrator verification; exact-head CI is queued or running."
-files[3]{path,scope}:
+  "2026-11-16T19:23:54.337Z",codex-sol,"Review round P: replace the workflow-wide regex with a dependency-free shell command parser and regression fixtures. Parse run scripts with existing yaml where available; preserve allowed prefix-local installs. Verify typecheck, lint or docstring, focused guard/workflow contracts and changelog checks before pushing. No review-thread actions."
+  "2026-11-16T19:28:33.450Z",codex-sol,"Review round P addresses PR #92 (no existing review thread): shared-npm replacement guard now tokenizes shell commands and uses existing yaml for run scripts. Added 38 fixtures covering npm aliases, flag placement/location, package specs, continuations, quotes/paths, separators and allowed installs. npm run typecheck, npm run build:test, npm run lint and npm run changelog:check PASS. The new linked guard and workflow contracts passed through pm test --run --only-last --progress: 71 pass, 0 fail/cancel/skip/todo. Full-suite certification is left to CI; review threads remain untouched."
+files[5]{path,scope}:
   .github/workflows/release.yml,project
   CHANGELOG.md,project
+  test/global-npm-guard.test.ts,project
+  test/global-npm-guard.ts,project
   test/release-approval.test.ts,project
-tests[3]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+tests[4]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
   "npm run typecheck && npm run lint && npm test && node --test test/release-approval.test.ts && npm run changelog:check",project,1200,codex-sol,"2026-11-16T15:20:07.661Z",local_mutation,fix/job-local-npm
   "npm run typecheck && npm run lint && npm test && node --test test/release-approval.test.ts && npm run changelog:check && git diff --check",project,3600,codex-sol,"2026-11-16T15:42:22.789Z",local_mutation,fix/job-local-npm
   "node --test test/release-approval.test.ts && npm run changelog:check",project,900,codex-sol,"2026-11-16T15:53:18.111Z",local_mutation,fix/job-local-npm
+  node --test test/global-npm-guard.test.ts test/release-approval.test.ts,project,1200,codex-sol,"2026-11-16T19:26:04.470Z",local_mutation,fix/job-local-npm
 body: ""

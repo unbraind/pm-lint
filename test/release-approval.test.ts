@@ -1,4 +1,5 @@
 /** Audit every workflow's effective permissions, publication approval and npm authentication. */
+import { workflowGlobalNpmInstalls } from './global-npm-guard.ts';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -272,12 +273,10 @@ test('no workflow replaces the shared global npm installation', () => {
   // installation. Parallel jobs on one host share that installation, so one
   // job's global install corrupts a sibling's npm mid-install. Every pinned
   // npm install must be prefix-local instead.
-  const replacers = /npm\s+(?=[^\n]*\b(?:install|i)\b)(?=[^\n]*(?:\s-g\b|--global\b))[^\n]*\bnpm@/u;
   for (const path of workflowFiles(fileURLToPath(workflowRoot))) {
     const source = readFileSync(path, 'utf8');
-    assert.doesNotMatch(source, replacers, `${basename(path)} must install the pinned npm into a job-local prefix`);
+    assert.deepEqual(workflowGlobalNpmInstalls(source), [], `${basename(path)} must install the pinned npm into a job-local prefix`);
   }
-  assert.match(fixture({ steps: [{ run: 'npm install -g npm@11.19.0' }] }), replacers, 'the audit must still detect a global npm install');
 });
 
 test('automatic release activation is absent and publishing documentation matches behaviour', () => {
