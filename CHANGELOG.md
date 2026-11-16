@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Install the pinned release npm into a job-local prefix ([pm-lint-qcob](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-qcob.toon))
+
 ### Other
 
 - Split quick PR checks from exhaustive local CI ([pm-lint-ci-v2](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-ci-v2.toon))

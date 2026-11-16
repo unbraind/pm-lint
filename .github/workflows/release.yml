@@ -261,7 +261,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install -g npm@11.19.0 --ignore-scripts
+          # Install into a job-local prefix instead of replacing the runner's npm:
+          # parallel jobs on one runner host share the Node installation in the
+          # toolcache, so a global install mutates a sibling job's npm mid-install.
+          npm install --prefix "$RUNNER_TEMP/npm-11.19.0" npm@11.19.0 --ignore-scripts --no-audit --no-fund
+          echo "$RUNNER_TEMP/npm-11.19.0/node_modules/.bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/npm-11.19.0/node_modules/.bin:$PATH"
           # Fail closed on the EFFECTIVE version, not on having run the install.
           # Installing is not the same as running: a swallowed install error, a
           # cached shim, or a later step selecting another npm all leave 10.x
@@ -275,6 +280,10 @@ jobs:
             exit 1
           fi
           echo "npm $active can exchange an OIDC token for a registry credential."
+
+      - name: Verify job-local npm version
+        shell: bash
+        run: test "$(npm --version)" = "11.19.0"
 
       - name: Download verified release artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
