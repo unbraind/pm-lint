@@ -2,12 +2,17 @@ id: pm-lint-hsa6
 title: Unblock the pm-github 2026.11.15 pin PR gates
 description: ""
 type: Task
-status: in_progress
+status: closed
 priority: 2
 tags[1]: "gh:unbraind/pm-lint#86"
 created_at: "2026-11-16T09:42:16.526Z"
-updated_at: "2026-11-16T13:02:40.239Z"
+updated_at: "2026-11-16T20:33:05.981Z"
+closed_at: "2026-11-16T20:33:05.902Z"
+completed_at: "2026-11-16T20:33:05.902Z"
 author: pi-glm
+resolution: Implemented and merged in #86 (2395abb).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #86 as 2395abb; checks successful at head 775f0ca: CodeQL, codeql, test (22), test (26)."
 comments[7]{created_at,author,text}:
   "2026-11-16T09:42:37.745Z",pi-glm,"PR checks test (22) and test (26) fail in the 'npm release gates' step at changelog:check: the committed CHANGELOG.md was stale — the generator expected an '## Unreleased / No changes.' section before the 2026.11.14 entry (log: 'Changelog is out of date'). Root cause: the pin branch was cut before the changelog regeneration landed on main. Fix: merge origin/main (which already carries the regenerated CHANGELOG.md; changelog:check passes again on the merged tree) — no changelog hand-edit, the file comes from the repo's changelog script on main. No review threads on this PR. Because this tracker's changelog includes in_progress items, the changelog is regenerated with the repo script again after this item's changes so changelog:check stays green at the pushed head."
   "2026-11-16T12:07:10.258Z",codex-sol,"Codex continuation: preserved merge 6c4c5cf and the existing uncommitted tracker item. Rechecking both failed check logs and regenerating the changelog from tracker data; no duplicate item or PR. No review threads were returned."
@@ -28,4 +33,5 @@ tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/pm-github-callers.test.ts,project,codex-sol,"2026-11-16T12:07:53.491Z",local_mutation,ci/pm-github-2026.11.15-bounded-ci-dispatch
 docs[1]{path,scope}:
   docs/ci-tiers.md,project
+close_reason: "Delivered by #86 \"Pin pm-github 2026.11.15 so sync and closeout stop holding runners while CI runs\" (merged as 2395abb). Checks successful at the PR head 775f0ca: CodeQL, codeql, test (22), test (26)."
 body: ""
