@@ -1,8 +1,9 @@
 /** Audit every workflow's effective permissions, publication approval and npm authentication. */
+import { workflowGlobalNpmInstalls } from './global-npm-guard.ts';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { parseDocument, stringify } from 'yaml';
@@ -263,8 +264,28 @@ test('publishing installs an npm version supporting trusted publishing', () => {
     const steps = mapping(job)?.steps;
     return Array.isArray(steps) ? steps.map(step => mapping(step)?.run).filter(value => typeof value === 'string') : [];
   }).join('\n');
-  const version = scripts.match(/npm install -g npm@(\d+)\.(\d+)\.(\d+)/u)?.slice(1).map(Number);
+  const version = scripts.match(/npm install --prefix "\$RUNNER_TEMP\/npm-(\d+)\.(\d+)\.(\d+)" npm@\1\.\2\.\3/u)?.slice(1).map(Number);
   assert.ok(version && (version[0] > 11 || version[0] === 11 && (version[1] > 5 || version[1] === 5 && version[2] >= 1)));
+  // The bootstrap installs the pinned npm into a job-local prefix; later
+  // steps reach it only through the bin directory appended to $GITHUB_PATH,
+  // and the verify step must expect exactly the installed version, not merely
+  // any newer one.
+  const pin = version!.join('.');
+  assert.ok(scripts.includes(`echo "$RUNNER_TEMP/npm-${pin}/node_modules/.bin" >> "$GITHUB_PATH"`),
+    'the bootstrap step must append the same prefix bin directory to $GITHUB_PATH');
+  assert.ok(scripts.includes(`test "$(npm --version)" = "${pin}"`),
+    'the verify step must expect exactly the installed version');
+});
+
+test('no workflow replaces the shared global npm installation', () => {
+  // A global npm install replaces the npm inside the runner's shared Node
+  // installation. Parallel jobs on one host share that installation, so one
+  // job's global install corrupts a sibling's npm mid-install. Every pinned
+  // npm install must be prefix-local instead.
+  for (const path of workflowFiles(fileURLToPath(workflowRoot))) {
+    const source = readFileSync(path, 'utf8');
+    assert.deepEqual(workflowGlobalNpmInstalls(source), [], `${basename(path)} must install the pinned npm into a job-local prefix`);
+  }
 });
 
 test('automatic release activation is absent and publishing documentation matches behaviour', () => {

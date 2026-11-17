@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Install the pinned release npm into a job-local prefix ([pm-lint-qcob](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-qcob.toon))
+
 ## 2026.11.17 - 2026-11-17
 
 ### Other
