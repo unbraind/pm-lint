@@ -6,8 +6,11 @@
 
 - Install the pinned release npm into a job-local prefix ([pm-lint-qcob](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-qcob.toon))
 
+## 2026.11.17 - 2026-11-17
+
 ### Other
 
+- Adopt SDK lint settings section reads ([pm-lint-sdk-settings-sections](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-settings-sections.toon))
 - Split quick PR checks from exhaustive local CI ([pm-lint-ci-v2](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-ci-v2.toon))
 
 ## 2026.11.14 - 2026-11-14
