@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -66,12 +67,12 @@ test('shared boundary refuses sparse arrays, invalid field/operator pairs and ex
 /** Preserve a previously released version 1 serialization, including whitespace literals. */
 function awaitlessExample(): string { return '{"version":1,"rules":[{"id":"ORG.legacy","field":"title","predicate":{"op":"contains","value":" x "},"severity":"warn","explanation":"Existing rule","remedy":"Keep literal whitespace"}]}'; }
 
-test('500 seeded extreme-input fuzz cases emit bounded finite receipts or typed refusals and preserve producer round trips', () => {
+test('seeded extreme-input fuzz cases emit bounded finite receipts or typed refusals and preserve producer round trips', () => {
   let seed = 0xe87e2026;
   const values = [NaN, Infinity, -Infinity, Number.MAX_VALUE, -Number.MAX_VALUE, Number.MIN_VALUE, -1, 0, 1, 4, 5, 65536, 65537, 0.5];
   let emitted = 0;
   let refused = 0;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     const value = values[seed % values.length];
     const field = seed % 3 === 0 ? 'priority' : 'description';
@@ -90,7 +91,9 @@ test('500 seeded extreme-input fuzz cases emit bounded finite receipts or typed 
       refused++;
     }
   }
-  assert.ok(emitted > 50 && refused > 50, 'the seed exercises both boundary outcomes');
+  assert.equal(emitted + refused, testDepth(500));
+  const minimum = (emitted + refused) / 10;
+  assert.ok(emitted > minimum && refused > minimum, 'generated cases exercise both boundary outcomes');
 });
 
 test('policy preflight rejects contradictions before a complete corpus read and preserves SDK state', async t => {

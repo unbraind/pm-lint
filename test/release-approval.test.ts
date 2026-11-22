@@ -1,8 +1,9 @@
 /** Audit every workflow's effective permissions, publication approval and npm authentication. */
+import { workflowGlobalNpmInstalls } from './global-npm-guard.ts';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { parseDocument, stringify } from 'yaml';
@@ -263,6 +264,17 @@ test('publishing delegates npm bootstrap to the SHA-pinned canonical workflow', 
   assert.ok(job);
   assert.match(String(job?.uses), /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/u);
   assert.equal(job.steps, undefined);
+});
+
+test('no workflow replaces the shared global npm installation', () => {
+  // A global npm install replaces the npm inside the runner's shared Node
+  // installation. Parallel jobs on one host share that installation, so one
+  // job's global install corrupts a sibling's npm mid-install. Every pinned
+  // npm install must be prefix-local instead.
+  for (const path of workflowFiles(fileURLToPath(workflowRoot))) {
+    const source = readFileSync(path, 'utf8');
+    assert.deepEqual(workflowGlobalNpmInstalls(source), [], `${basename(path)} must install the pinned npm into a job-local prefix`);
+  }
 });
 
 test('automatic release activation is absent and publishing documentation matches behaviour', () => {

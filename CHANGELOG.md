@@ -1,8 +1,23 @@
 # Changelog
 
-## Unreleased
+## 2026.11.18 - 2026-11-18
 
-No changes.
+### Fixed
+
+- Install the pinned release npm into a job-local prefix ([pm-lint-qcob](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-qcob.toon))
+
+## 2026.11.17 - 2026-11-17
+
+### Other
+
+- Unblock the pm-github 2026.11.15 pin PR gates ([pm-lint-hsa6](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-hsa6.toon))
+- Split quick PR checks from exhaustive local CI ([pm-lint-ci-v2](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/tasks/pm-lint-ci-v2.toon))
+
+## 2026.11.14 - 2026-11-14
+
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.11.9 to 2026.11.10 in the pm-toolchain group ([#82](https://github.com/unbraind/pm-lint/pull/82))
 
 ## 2026.11.12 - 2026-11-12
 
