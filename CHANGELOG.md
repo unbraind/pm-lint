@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- Daily release never publishes: npm reads release-artifact/package.tgz as a GitHub repository ([pm-lint-4tem](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-4tem.toon))
-
 ## 2026.11.18 - 2026-11-18
 
 ### Fixed
@@ -79,6 +73,10 @@ No changes.
 
 - Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs ([pm-lint-8kis](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-8kis.toon))
 - Enable the gated GitHub issue sync and drop the braces chain ([pm-lint-maint1014](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-maint1014.toon))
+
+### Fixed
+
+- Daily release never publishes: npm reads release-artifact/package.tgz as a GitHub repository ([pm-lint-4tem](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-4tem.toon))
 
 ### Other
 
