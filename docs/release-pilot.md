@@ -2,9 +2,10 @@
 
 This package delegates its release transaction to
 `unbraind/pm-ops/.github/workflows/daily-release.yml` at
-`7687a35d7522482bd8361d60dbc2589e9afbc81c # v2026.11.14`.
+`c46a2419c63af3b348e6b559b0733ab0d9942cc7 # v2026.11.18`.
 The canonical Git tag API identifies that object directly as a commit; the local
-peeled tag agrees. The release was published on 2026-11-14 at 06:06:41Z.
+peeled tag agrees. This release installs npm 11.21.0 in a job-local prefix and verifies the effective
+version. The pin preserves the shared-runner isolation introduced in pm-lint #92.
 
 The caller retains the daily preparation schedule and adds canonical hourly
 reconciliation, opt-in unpublished-intent retirement, empty workflow permissions
@@ -35,20 +36,10 @@ No merge, release dispatch or publication is performed by the pilot PR.
 
 ## Pre-merge prerequisites
 
-The orchestrator authorized the exact pm-ops devDependency update to 2026.11.14.
-The installed released validator now accepts this caller, including its required
-`checks: read` permission, without weakening permissions or attestation checks.
-package-lock.json records the same version; no Bun lockfile is present.
-Full npm/Bun certification remains with CI; no full local pass is claimed.
-
-A scratch tracker with the actual pm-changelog 2026.11.7 scripts passes empty
-release generation, notes and pre-tag checking, but post-tag checking reproduces
-the empty-Unreleased drift in existing pm-changelog #337. That component sub-part
-remains blocked until its generator/wrapper passes the same post-tag check.
-
-Focused workflow/approval/metadata tests pass 42/42, and focused tracking and
-attestation tests pass 4/4. This PR remains a draft until pm-changelog #337 is fixed
-and released, and the actual package hooks pass the post-tag check.
+The package keeps its current pm-ops 2026.11.14 validator and pm-changelog
+2026.11.13 dependency. pm-changelog issue #337 is closed. The package changelog
+commands still use the same explicit empty-release policy.
+The hosted OIDC identity exchange remains the activation gate.
 
 ## Fleet rollout receipt
 
@@ -57,7 +48,9 @@ tracked centrally by `ops-release-diagnosis-propagation`. Both pilot PR URLs and
 final validation receipts are recorded in the package pilot items. No additional
 pm-ops code/tracker PR or push to #275 is part of this continuation.
 
-Pilot PRs: [pm-jira #209](https://github.com/unbraind/pm-jira/pull/209) goes first for review and orchestrator activation; [pm-lint #85](https://github.com/unbraind/pm-lint/pull/85) remains a draft until pm-changelog #337 is fixed and released. Neither is merged or activated by this work.
+Pilot PRs: [pm-jira #209](https://github.com/unbraind/pm-jira/pull/209) merged.
+[pm-lint #85](https://github.com/unbraind/pm-lint/pull/85) still requires review
+and orchestrator activation.
 
 After pm-lint and pm-jira, the remaining 34 authorized packages are:
 
