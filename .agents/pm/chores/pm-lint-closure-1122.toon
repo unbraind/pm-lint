@@ -1,0 +1,21 @@
+id: pm-lint-closure-1122
+title: Refresh tracker closure PR #76
+description: "Recheck current main, verify delivery evidence, regenerate the changelog and record the validation outcome."
+type: Chore
+status: open
+priority: 2
+tags[1]: tracker-sweep
+created_at: "2026-11-22T23:52:17.056Z"
+updated_at: "2026-11-23T00:01:09.378Z"
+author: codex-agent
+comments[3]{created_at,author,text}:
+  "2026-11-22T23:52:19.632Z",codex-agent,PR #41 merged as 57a49b5b9e2b4d69f2a80b4b9f1da33af7ef9b0e. The public npm package 2026.10.28 carries SLSA provenance for the package release workflow at that exact commit. Its package release and tag verify the remaining acceptance.
+  "2026-11-22T23:58:25.956Z",codex-agent,"The v2026.10.28 npm tarball SHA-512 matches the SLSA statement subject. The provenance build identifies the repository release workflow, main ref, exact PR #41 merge commit and GitHub Actions run 40733982683. The GitHub release exists and is published."
+  "2026-11-23T00:01:07.323Z",codex-agent,"Focused linked test completed successfully. 68 pass, 0 fail, 0 skipped."
+files[1]{path,scope}:
+  CHANGELOG.md,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/tooling.test.ts test/release-approval.test.ts,project,codex-agent,"2026-11-22T23:52:24.397Z",local_mutation,pm-github/closeout
+docs[1]{path,scope}:
+  CHANGELOG.md,project
+body: ""
