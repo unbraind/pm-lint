@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.11.24 - 2026-11-24
 
 ### Other
 
@@ -8,7 +8,7 @@
 
 ### Dependencies
 
-- Bump the codeql-action group with 2 updates
+- Bump the codeql-action group with 2 updates ([#103](https://github.com/unbraind/pm-lint/pull/103))
 
 ## 2026.11.23 - 2026-11-23
 
