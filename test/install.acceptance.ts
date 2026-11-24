@@ -462,6 +462,10 @@ console.log('packed-deferred-settings-bound-ok');
 `);
     assert.match(command(cwd, runtime === 'npm' ? process.execPath : 'bun', ['repair-deferred-sdk.mjs'], pmRoot), /packed-deferred-settings-bound-ok/);
     // The packed incremental SDK and command preserve a complete result across every host acquisition mode.
+    const missingState = runConsumer(cwd, runner, [...prefix, '--json', 'lint', 'incremental'], pmRoot, undefined, 2);
+    const incrementalRefusal = JSON.parse(missingState.stdout) as { findings: unknown[]; refusal: { code: string } };
+    assert.deepEqual(incrementalRefusal.findings, []);
+    assert.equal(incrementalRefusal.refusal.code, 'invalid_input');
     const state = join(cwd, 'lint.local.json');
     const incremental = jsonRead(cwd, runner, prefix, pmRoot, ['incremental'], ['--state', state, '--rebuild']);
     assert.equal(incremental.data.ok, true);

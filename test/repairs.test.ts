@@ -4,7 +4,7 @@ import { assertRepairReplay } from './repair-receipt.ts';
 import test from 'node:test';
 import { chmod, link, mkdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, isPmCliExpectedError, readSettings, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
+import { PmClient, certifyCompleteListResult, clearActiveExtensionHooks, getItemPath, getSettingsPath, isPmCliExpectedError, readSettings, serializeItemDocument, setActiveExtensionHooks } from '@unbrained/pm-cli/sdk';
 import type { ItemMetadata } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
@@ -591,6 +591,7 @@ test('requests, limits, core refusals and blank substantive titles stay explicit
 
 test('every asynchronous preview boundary rejects a competing target transition on one non-git tracker', async t => {
   const { client, pmRoot } = await tracker(t);
+  const peer = new PmClient({ pmRoot, author: 'lint-test-peer', noExtensions: true });
   const item = (await client.create({ title: 'Check every interleaving boundary', type: 'Task' })).item;
   const boundaries: RepairBoundary[] = ['snapshot_read', 'settings_read', 'settings_bound', 'source_read', 'planned', 'validated', 'source_rechecked'];
   for (const boundary of boundaries) {
@@ -598,14 +599,24 @@ test('every asynchronous preview boundary rejects a competing target transition 
     const saved = await previewAuthoringRepairs(pmRoot, { id: item.id });
     let injected = false;
     await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id, revision: saved.revision }, { onBoundary: async step => {
-      if (step === boundary) { injected = true; await client.update(item.id, { description: `Peer succeeded at ${boundary}` }); }
+      if (step !== boundary) return;
+      if (step === 'settings_bound') {
+        const before = await inventory(pmRoot);
+        await assert.rejects(client.update(item.id, { description: 'Attempt a nested cwd change' }), {
+          code: 'invalid_argument_value',
+          message: /A nested SDK call cannot change the working directory/,
+        });
+        assert.equal(await inventory(pmRoot), before);
+      }
+      injected = true;
+      await peer.update(item.id, { description: `Peer succeeded at ${boundary}` });
     } }), refusal('stale_revision'));
     assert.equal(injected, true, boundary);
     assert.equal((await client.get(item.id, { full: true })).item.description, `Peer succeeded at ${boundary}`);
   }
   await seed(pmRoot, item);
   await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
-    if (step === 'validated') await client.update(item.id, { tags: 'peer' });
+    if (step === 'validated') await peer.update(item.id, { tags: 'peer' });
   } }), refusal('stale_revision'));
   await assert.rejects(previewAuthoringRepairs(pmRoot, { id: item.id }, { onBoundary: async step => {
     if (step === 'source_rechecked') {

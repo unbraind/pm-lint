@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { commitImportedItem, readSettings } from '@unbrained/pm-cli/sdk';
+import { commitImportedItem, mutateItem, readSettings } from '@unbrained/pm-cli/sdk';
 import { activateExtensionForTest, assertRegisteredCommandContract, runRegisteredCommandForTest } from '@unbrained/pm-cli/sdk/testing';
 import type { CommandHandlerContext } from '@unbrained/pm-cli/sdk/authoring';
 import extension, { lintWitnesses, parseWitnessContract, observationDigest, sourceDigest, WitnessRefusal } from '../index.ts';
@@ -76,10 +76,22 @@ test('current linked tests bind all metadata and ambiguous identities contradict
   assert.equal(precise.summary.supported, 1);
   assert.equal(precise.findings[0].citation, 'first.ts');
   const pathItem = (await client.create({ type: 'Task', title: 'Keep path-only linked tests', acceptanceCriteria: 'Exact path' })).item;
-  // The pinned writer requires commands; import a valid legacy path-only declaration.
-  const imported = await commitImportedItem({ pmRoot, id: pathItem.id, itemPath: join(pmRoot, 'tasks', `${pathItem.id}.toon`), document: { metadata: { ...pathItem, tests: [{ path: 'test/proof.ts', scope: 'project' }] }, body: '' }, author: 'lint-test', message: 'Import path-only linked test', settings: await readSettings(pmRoot), conflictWarningPrefix: 'fixture' });
-  assert.equal(imported.committed, true);
+  const tests = [{ path: 'test/proof.ts', scope: 'project' as const }];
+  const settings = await readSettings(pmRoot);
+  const itemPath = join(pmRoot, 'tasks', `${pathItem.id}.toon`);
+  const beforeImport = await readFile(itemPath);
+  const imported = await commitImportedItem({ pmRoot, id: pathItem.id, itemPath, document: { metadata: { ...pathItem, tests }, body: '' }, author: 'lint-test', message: 'Import path-only linked test', settings, conflictWarningPrefix: 'fixture' });
+  assert.deepEqual(imported, { committed: false, conflictWarning: `fixture:${pathItem.id}` });
+  assert.deepEqual(await readFile(itemPath), beforeImport);
+  // Seed readable legacy metadata through the native mutation lock and history.
+  await mutateItem({ pmRoot, id: pathItem.id, settings, author: 'lint-test', op: 'import', message: 'Seed legacy path-only linked test',
+    mutate: document => {
+      document.metadata.tests = tests;
+      return { changedFields: ['tests'] };
+    },
+  });
   const pathOnly = (await client.listAllComplete()).items.find(entry => entry.id === pathItem.id)!;
+  assert.deepEqual(pathOnly.tests, tests);
   const byPath = await lintWitnesses(client, contract(pathOnly.id, 'Exact path', [{ kind: 'test', path: 'test/proof.ts', sha256: sourceDigest(pathOnly.tests![0]), outcome: 'pass' }]), root);
   assert.equal(byPath.summary.supported, 1);
   assert.equal(byPath.findings.find(row => row.state === 'supported')?.citation, 'test/proof.ts');
@@ -176,7 +188,10 @@ test('registered host command renders success, failing rows and typed refusals',
   assert.deepEqual(registered.command.read_output?.row_keys, ['findings']);
   const result = await runRegisteredCommandForTest(activation.commands, { command: 'lint witnesses', options: { contract: join(root, 'contract.json') }, pmRoot });
   assert.equal(result.handled, true);
-  assert.equal((result.result as { exit_code: number }).exit_code, 2, 'the SDK dispatcher omits workspace coordinates; refuse absent evidence roots');
+  const scoped = result.result as WitnessResult;
+  assert.equal(scoped.criteria_count, 0);
+  assert.deepEqual(scoped.findings, []);
+  assert.equal('exit_code' in scoped, false);
   const ctx: CommandHandlerContext = { command: 'lint witnesses', args: [], options: { contract: 'contract.json' }, pm_root: pmRoot, repo_root: root, global: { author: 'lint-test' } };
   assert.equal('exit_code' in await runWitnessCommand(ctx), false);
   const item = (await client.create({ type: 'Task', title: 'Require declared witnesses', acceptanceCriteria: 'Proof' })).item;
@@ -190,7 +205,12 @@ test('registered host command renders success, failing rows and typed refusals',
   ctx.options.contract = 'contract.json';
   delete ctx.repo_root;
   delete ctx.source_workspace_root;
-  assert.equal((await runWitnessCommand(ctx)).exit_code, 2);
+  const unscoped = await runWitnessCommand(ctx);
+  assert.equal(unscoped.exit_code, 2);
+  assert.deepEqual(unscoped.findings, []);
+  const refusal = unscoped.refusal as { code: string; message: string };
+  assert.equal(refusal.code, 'invalid_contract');
+  assert.match(refusal.message, /evidence workspace is missing/);
   ctx.repo_root = root;
   ctx.options.contract = 'absent.json';
   assert.equal((await runWitnessCommand(ctx)).exit_code, 2);

@@ -1,0 +1,29 @@
+id: pm-lint-sdk-1122
+title: Adopt pm-cli 2026.11.23 host-aligned SDK behaviour
+description: "Companion item: pm-cli-website-spus. Resolve the incremental and witness toolchain adoption failures in pm-lint issue 101."
+type: Chore
+status: in_progress
+priority: 2
+tags[1]: "gh:unbraind/pm-lint#101"
+created_at: "2026-11-24T03:25:00.632Z"
+updated_at: "2026-11-24T05:26:45.179Z"
+author: codex-agent
+acceptance_criteria: "Deliver typed incremental refusals and the declared findings collection in the harness and packed CLI.; Keep legacy path-only witness metadata readable and cover both workspace resolution and missing-context refusal.; Pin the published toolchain, retain published dependency bullets, and pass the package release gates."
+comments[1]{created_at,author,text}:
+  "2026-11-24T05:26:43.340Z",codex-agent,"The full two-worker baseline after pinning pm-cli 2026.11.23, pm-changelog 2026.11.20 and pm-ops 2026.11.22 passed 495 of 499 tests. Build and typecheck passed.\n\n- \"registered command renders compact refusals and real TOON/JSON without git on PATH\" used to receive a result without a declared row collection. The current host reports extension_read_output_invalid before delivery. Return findings as an empty array while preserving the typed invalid_input refusal, remedy, and exit 2.\n- \"current linked tests bind all metadata and ambiguous identities contradict\" used imported creation as an overwrite. Fenced creation now refuses the occupied ID. Check that its bytes are preserved, then seed through native locked mutation and prove legacy path-only metadata still reads and resolves.\n- \"registered host command renders success, failing rows and typed refusals\" assumed harness coordinates were missing. The host derives them from the invocation workspace. Check that scoped use succeeds and that a direct invocation with neither coordinate returns the typed invalid_contract refusal.\n- \"every asynchronous preview boundary rejects a competing target transition on one non-git tracker\" used a client that supplied cwd inside an extension scope. The host now refuses that request before mutation. The test checks unchanged bytes for the refused call and uses a path-scoped peer for the stale-revision assertions.\n\nDisposable reverts reproduced all four failures and the restored focused tests passed. Linked tests passed 23/23. The five focused cases passed on Node 22.18 and 26.13.\n\nThe full-depth npm release check and the CI-quick Bun release check each passed 500/500 tests and 1/1 packed npm/npx and Bun/bunx acceptance. Both reached 100% statements, branches, functions, and lines across the 32 configured files. Production audit found zero vulnerabilities. Typecheck, lint, docstrings, duplication, public identity and privacy, strict tracker health and changelog checks passed. The four changelog script flags retained the published dependency entry and restored 39 historical bullets. All four individual flag removals failed the regression.\n\nThe reproduced failures match the installed SDK contracts. An existing development-only advisory chain is tracked by pm-lint-glob-audit-1124."
+files[8]{path,scope}:
+  package-lock.json,project
+  package.json,project
+  src/incremental-command.ts,project
+  test/incremental.test.ts,project
+  test/install.acceptance.ts,project
+  test/package-metadata.test.ts,project
+  test/repairs.test.ts,project
+  test/witnesses.test.ts,project
+tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=1 test/incremental.test.ts test/witnesses.test.ts test/package-metadata.test.ts,project,600,codex-agent,"2026-11-24T04:00:42.224Z",local_mutation,deps/adopt-pm-cli-host-alignment-1122
+  "node --test --test-concurrency=1 --test-name-pattern \"every asynchronous preview boundary\" test/repairs.test.ts",project,600,codex-agent,"2026-11-24T04:10:22.682Z",local_mutation,deps/adopt-pm-cli-host-alignment-1122
+docs[2]{path,scope}:
+  CHANGELOG.md,project
+  docs/incremental-validation.md,project
+body: ""

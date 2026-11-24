@@ -7,6 +7,7 @@ import { test } from 'node:test';
 interface PackageMetadata {
   name: string;
   homepage: string;
+  scripts: Record<string, string>;
   publishConfig: { access: string };
   pm: { aliases: string[]; catalog: { display_name: string; links: { npm: string } } };
 }
@@ -33,4 +34,11 @@ test('registry Bun verification resolves the scoped npm package', () => {
   assert.match(workflow, /pkg_name="@unbrained\/pm-lint"/);
   assert.doesNotMatch(workflow, /pkg_name="pm-lint"/);
   assert.match(workflow, /bun add "\$\{pkg_name\}@\$\{pkg_version\}"/);
+});
+
+test('every changelog entry point retains published dependency updates', () => {
+  const { scripts } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as PackageMetadata;
+  for (const name of ['changelog', 'changelog:full', 'changelog:check', 'release:notes']) {
+    assert.ok(scripts[name]?.split(/\s+/u).includes('--dependency-updates'), name);
+  }
 });

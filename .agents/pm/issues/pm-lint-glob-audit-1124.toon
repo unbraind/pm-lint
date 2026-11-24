@@ -1,0 +1,12 @@
+id: pm-lint-glob-audit-1124
+title: Remove the development coverage dependency on affected glob releases
+description: "The npm audit for the development tree reported GHSA-3g3m-2fjr-6pw4 through c8 12.0.0, test-exclude 8.0.0 and glob 13.0.6. npm reports the advisory on glob and propagates it to both dependents. This chain was already present before the host SDK migration. The proposed npm automatic fix changes the c8 major version."
+type: Issue
+status: open
+priority: 2
+tags[2]: dependencies,maintenance
+created_at: "2026-11-24T03:27:01.720Z"
+updated_at: "2026-11-24T03:27:01.720Z"
+author: codex-agent
+acceptance_criteria: Verify the actual development dependency graph no longer contains an affected glob version.; Run the existing all-source coverage and release gates at their current thresholds.
+body: ""
