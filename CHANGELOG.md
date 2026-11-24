@@ -6,6 +6,10 @@
 
 - Adopt pm-cli 2026.11.23 host-aligned SDK behaviour ([pm-lint-sdk-1122](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-1122.toon))
 
+### Dependencies
+
+- Bump the codeql-action group with 2 updates
+
 ## 2026.11.23 - 2026-11-23
 
 No changes.
