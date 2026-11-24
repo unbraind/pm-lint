@@ -13,7 +13,7 @@ export async function runIncrementalCommand(ctx: CommandHandlerContext): Promise
     return { ok: true, ...result, incremental: scan.incremental, ...(exit_code === 0 ? {} : { exit_code }) };
   } catch (error) {
     if (!(error instanceof IncrementalRefusal)) throw error;
-    return { ok: false, refusal: { code: error.code, message: error.message, remedy: error.remedy }, exit_code: 2 };
+    return { ok: false, findings: [], refusal: { code: error.code, message: error.message, remedy: error.remedy }, exit_code: 2 };
   }
 }
 
