@@ -10,6 +10,10 @@ No changes.
 
 - Adopt pm-cli 2026.11.23 host-aligned SDK behaviour ([pm-lint-sdk-1122](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/chores/pm-lint-sdk-1122.toon))
 
+### Closed
+
+- Closed: Adapt incremental and witness checks before bumping the PM SDK toolchain ([pm-lint-github-253a36d6af64-101](https://github.com/unbraind/pm-lint/blob/main/.agents/pm/issues/pm-lint-github-253a36d6af64-101.toon))
+
 ### Dependencies
 
 - Bump the codeql-action group with 2 updates ([#103](https://github.com/unbraind/pm-lint/pull/103))

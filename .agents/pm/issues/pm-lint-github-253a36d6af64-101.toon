@@ -1,0 +1,25 @@
+id: pm-lint-github-253a36d6af64-101
+title: Adapt incremental and witness checks before bumping the PM SDK toolchain
+description: "GH issue #101: https://github.com/unbraind/pm-lint/issues/101 · author @unbraind · state reason completed · created 2026-11-23T14:49:20Z · updated 2026-11-24T06:20:20Z"
+type: Issue
+status: closed
+priority: 2
+tags[2]: "gh:unbraind/pm-lint#101","github_author:unbraind"
+created_at: "2026-11-23T14:49:20Z"
+updated_at: "2026-11-27T09:42:36.249Z"
+closed_at: "2026-11-24T06:20:20Z"
+completed_at: "2026-11-24T06:20:20Z"
+author: pm-github
+release: v2026.11.24
+close_reason: "Closed on GitHub as completed on 2026-11-24T06:20:20Z; closing PR https://github.com/unbraind/pm-lint/pull/102 (\"Adopt pm-cli 2026.11.23: preserve incremental refusals and witness compatibility\")"
+github_close_reason: "Closed on GitHub as completed on 2026-11-24T06:20:20Z; closing PR https://github.com/unbraind/pm-lint/pull/102 (\"Adopt pm-cli 2026.11.23: preserve incremental refusals and witness compatibility\")"
+github_closed_at: "2026-11-24T06:20:20Z"
+github_created_at: "2026-11-23T14:49:20Z"
+github_link_only: false
+github_number: 101
+github_release: v2026.11.24
+github_state: closed
+github_state_reason: completed
+github_updated_at: "2026-11-24T06:20:20Z"
+github_url: "https://github.com/unbraind/pm-lint/issues/101"
+body: "[Toolchain PR #99](https://github.com/unbraind/pm-lint/pull/99) fails three existing checks on [Node 22 and 26](https://github.com/unbraind/pm-lint/actions/runs/45179154933). This is a dependency-adoption blocker, not a current release incident.\n\nIndependently reproduced at `28542ba2540905e6d7407457410738064a5e75a0` on Node 24.22.3 with disposable trackers. Build and test typecheck passed. With identical candidate dependencies except the installed official Core artifact, 2026.11.14 passes 3/3, and 2026.11.20 and 2026.11.23 each pass 0/3 on the same assertions.\n\n- [Incremental command](https://github.com/unbraind/pm-lint/blob/28542ba2540905e6d7407457410738064a5e75a0/test/incremental.test.ts#L209): the missing-state call expects a compact `invalid_input` refusal, but Core now detects the absent declared `findings` collection before that result is delivered. Related [Core contract](https://github.com/unbraind/pm-cli/issues/1729).\n- [Linked witness metadata](https://github.com/unbraind/pm-lint/blob/28542ba2540905e6d7407457410738064a5e75a0/test/witnesses.test.ts#L70): the legacy path-only fixture's `commitImportedItem` reports `committed: false` instead of true. Confirm supported legacy-read setup without bypassing validation.\n- [Witness command context](https://github.com/unbraind/pm-lint/blob/28542ba2540905e6d7407457410738064a5e75a0/test/witnesses.test.ts#L169): the harness returns no exit code where the test assumes coordinates are absent and expects exit code 2. Test the valid scoped invocation separately from a genuinely missing-context refusal.\n\nFocused test after installing and building: `node --test --test-name-pattern 'registered command renders compact refusals|current linked tests bind all metadata|registered host command renders success' test/incremental.test.ts test/witnesses.test.ts`.\n\nAcceptance: current supported Core pin passes all three checks and the quick matrix; keep useful typed incremental refusals and declared read-output validation in both harness and packed CLI; preserve witness legacy-read and missing-context coverage. No full release gate run in this local comparison.\n\n---\n\n### GitHub comments (1)\n\n> **@unbraind** (2026-11-23T17:18:28Z)\n>\n> Triaged 2026-11-23: covered by the queued fleet SDK migration round `sdk-presets-lint-1122` (pm-cli 2026.11.14 → current; guide in the companion's docs/sdk-migration-2026-11.md). Its PR will say `Fixes #101`. Two of the three failures match classes already fixed fleet-wide: the host detects the missing declared collection before the package refusal (GH-1729), and fenced creation refuses occupied IDs, so fixtures seed through native mutation (as in pm-github#271)."
