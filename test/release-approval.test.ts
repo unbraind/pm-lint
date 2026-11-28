@@ -194,13 +194,15 @@ function inspectWorkflow(source: string, filename: string): string[] {
     let writable = false;
     try { writable = writes(effective); }
     catch { issues.push(`${location}: invalid permissions`); }
-    const condition = typeof job.if === 'string' ? job.if : '';
+    const canonical = typeof job.uses === 'string' && /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/u.test(job.uses);
+    const enabled = canonical ? mapping(job.with)?.['release-enabled'] : job.if;
+    const condition = typeof enabled === 'string' ? enabled : '';
     const steps = Array.isArray(job.steps) ? job.steps : [];
     const commands = steps.flatMap(step => {
       const value = mapping(step)?.run;
       return typeof value === 'string' ? publications(value) : [];
     });
-    const reusablePublisher = typeof job.uses === 'string' && /\/(?:release|publish)[^/]*\.ya?ml@/u.test(job.uses);
+    const reusablePublisher = typeof job.uses === 'string' && /\/(?:daily-release|release|publish)[^/]*\.ya?ml@/u.test(job.uses);
     const publishes = commands.length > 0 || reusablePublisher;
     if ((writable || publishes) && !requiresAtom(condition, repositoryAtom)) issues.push(`${location}: exact repository guard required`);
     if (condition.includes('github.repository_owner')) issues.push(`${location}: repository_owner is not a repository guard`);
@@ -247,34 +249,21 @@ test('daily/manual release triggers and preparation gates remain enforced', () =
   const release = document(readFileSync(new URL('release.yml', workflowRoot), 'utf8'));
   const events = mapping(release.on);
   assert.ok(events && Object.hasOwn(events, 'workflow_dispatch'));
-  assert.deepEqual(events.schedule, [{ cron: '23 3 * * *' }]);
+  assert.deepEqual(events.schedule, [{ cron: '23 3 * * *' }, { cron: '41 * * * *' }]);
   const jobs = mapping(release.jobs);
   assert.ok(jobs?.release);
-  for (const name of ['prepare', 'release', 'resume_release']) {
-    const job = mapping(jobs[name]);
-    if (!job) continue;
-    assert.ok(typeof job.if === 'string');
-    for (const atom of [repositoryAtom, approvalAtom, mainAtom]) assert.ok(requiresAtom(job.if, atom), `${name} must require ${atom}`);
-  }
+  const job = mapping(jobs.release);
+  const enabled = mapping(job?.with)?.['release-enabled'];
+  assert.equal(typeof enabled, 'string');
+  for (const atom of [repositoryAtom, approvalAtom, mainAtom]) assert.ok(requiresAtom(String(enabled), atom), `release must require ${atom}`);
 });
 
-test('publishing installs an npm version supporting trusted publishing', () => {
+test('publishing delegates npm bootstrap to the SHA-pinned canonical workflow', () => {
   const release = document(readFileSync(new URL('release.yml', workflowRoot), 'utf8'));
-  const scripts = Object.values(mapping(release.jobs) ?? {}).flatMap(job => {
-    const steps = mapping(job)?.steps;
-    return Array.isArray(steps) ? steps.map(step => mapping(step)?.run).filter(value => typeof value === 'string') : [];
-  }).join('\n');
-  const version = scripts.match(/npm install --prefix "\$RUNNER_TEMP\/npm-(\d+)\.(\d+)\.(\d+)" npm@\1\.\2\.\3/u)?.slice(1).map(Number);
-  assert.ok(version && (version[0] > 11 || version[0] === 11 && (version[1] > 5 || version[1] === 5 && version[2] >= 1)));
-  // The bootstrap installs the pinned npm into a job-local prefix; later
-  // steps reach it only through the bin directory appended to $GITHUB_PATH,
-  // and the verify step must expect exactly the installed version, not merely
-  // any newer one.
-  const pin = version!.join('.');
-  assert.ok(scripts.includes(`echo "$RUNNER_TEMP/npm-${pin}/node_modules/.bin" >> "$GITHUB_PATH"`),
-    'the bootstrap step must append the same prefix bin directory to $GITHUB_PATH');
-  assert.ok(scripts.includes(`test "$(npm --version)" = "${pin}"`),
-    'the verify step must expect exactly the installed version');
+  const job = mapping(mapping(release.jobs)?.release);
+  assert.ok(job);
+  assert.match(String(job?.uses), /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/u);
+  assert.equal(job.steps, undefined);
 });
 
 test('no workflow replaces the shared global npm installation', () => {
@@ -306,6 +295,8 @@ test('the manifest remains public and identifies its catalog and public author',
 });
 
 const negativeFixtures: { name: string; source: string; issue: RegExp }[] = [
+  { name: 'canonical caller without the approval input', source: fixture({ uses: 'unbraind/pm-ops/.github/workflows/daily-release.yml@' + 'a'.repeat(40), permissions: { contents: 'write' }, with: { 'release-enabled': `${repositoryAtom} && ${mainAtom}` } }), issue: /publishing approval/u },
+  { name: 'canonical caller with a truthy approval bypass', source: fixture({ uses: 'unbraind/pm-ops/.github/workflows/daily-release.yml@' + 'a'.repeat(40), permissions: { contents: 'write' }, with: { 'release-enabled': `${repositoryAtom} && ${mainAtom} && (${approvalAtom} || true)` } }), issue: /publishing approval/u },
   { name: 'CodeQL analyze security-events write', source: fixture({ permissions: { 'security-events': 'write' }, steps: [] }, undefined, 'analyze'), issue: /exact repository guard/u },
   { name: 'Dependabot owner-only guard', source: fixture({ if: "github.repository_owner == 'unbraind' && github.actor == 'dependabot[bot]'", permissions: { 'pull-requests': 'write' } }, undefined, 'enable-auto-merge'), issue: /repository_owner/u },
   { name: 'another repository under the same owner', source: fixture({ if: "github.repository == 'unbraind/another-package'", permissions: { contents: 'write' } }), issue: /exact repository guard/u },

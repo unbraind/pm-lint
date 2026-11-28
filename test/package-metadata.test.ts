@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+import { parseDocument } from 'yaml';
 
 /** Published npm identity and the independent pm catalog identity. */
 interface PackageMetadata {
@@ -31,9 +32,11 @@ test('scoped npm metadata preserves the public homepage and pm extension identit
 
 test('registry Bun verification resolves the scoped npm package', () => {
   const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
-  assert.match(workflow, /pkg_name="@unbrained\/pm-lint"/);
-  assert.doesNotMatch(workflow, /pkg_name="pm-lint"/);
-  assert.match(workflow, /bun add "\$\{pkg_name\}@\$\{pkg_version\}"/);
+  const caller = parseDocument(workflow).toJS() as { jobs: { release: { uses: string; with: Record<string, unknown> } } };
+  assert.match(caller.jobs.release.uses, /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/u);
+  assert.notEqual(caller.jobs.release.with['bun-verify'], false, 'retain canonical verification using package.json name');
+  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as PackageMetadata;
+  assert.equal(pkg.name, '@unbrained/pm-lint');
 });
 
 test('every changelog entry point retains published dependency updates', () => {
